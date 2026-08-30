@@ -430,10 +430,10 @@ function SimCityTongKim:onPlayerEnterMap(pW)
 	
 	-- Neu tim thay Quan Nhu Quan thi them vao Trieu Man va Vo Ky
 	if tmpFound then
-		if didRemove == 0 then
-			SimCityChienTranh:removeAll(pW)
-		end
 		AddTimer(18*2, "SimCityTongKim:addTongKimNpcByPlayer", PlayerIndex)
+		if simTK and simTK.ensureBots and GetMissionV and GetMissionV(1) == 2 then
+			simTK:ensureBots(pW)
+		end
 	end
 
 end
