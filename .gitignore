@@ -1,0 +1,31 @@
+# Binaries & runtime logs
+jx_linux_y
+*.so
+Logs/
+dulieu/
+itemexchange_setting/
+rolevalueladder_setting/
+worldrank/
+pak/
+font/
+servershutdown_log
+192.168.1.188
+data/
+
+# Skills & AI Orchestration infrastructure
+.agents/
+.ai/
+.brain/
+gemini-and-chatgpt/
+upstream_simcity/
+
+# Python & Caches
+__pycache__/
+*.pyc
+.pytest_cache/
+*.pma
+*.dat
+*.log
+*.jsonl
+*.tmp
+*.bak
