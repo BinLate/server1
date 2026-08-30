@@ -28,9 +28,25 @@ TIME_RESTING = { -- nghi ngoi, khong danh nhau lai trong vong thoi gian nay
 }
 
 -- TONG KIM setup
+TONGKIM_SIMBOT_PER_CAMP = 5       -- so luong Simbot toi da moi phe trong Tong Kim (5 Tong / 5 Kim)
+TONGKIM_SIMBOT_TOTAL = 10         -- tong so Simbot toi da toan chien truong Tong Kim (10 bot total)
 TONGKIM_SPAWN_MINSTAY = 0         -- thoi gian toi thieu o lai dai doanh truoc khi xong len
 TONGKIM_SPAWN_MAXSTAY = 1        -- thoi gian toi da co the nup trong dai doanh
 
+-- DYNAMIC AOI & TRAINING MAP BUDGET setup
+TRAIN_BOT_MAX_PER_MAP = 25        -- so luong bot toi da tren 1 map luyen cong
+TRAIN_BOT_GLOBAL_BUDGET = 200     -- tong ngan sach Simbot luyen cong toan server
+AOI_SCAN_INTERVAL = 15            -- chu ky quet nguoi choi (giay)
+AOI_HIBERNATE_TIMEOUT = 120       -- thoi gian khong co nguoi choi se hibernate (giay)
+
+-- SIMBOT COMBAT SAFETY & LIMITS
+SIMBOT_MAX_LEVEL = 200            -- cap do toi da cua Simbot
+SIMBOT_CHASE_MAX_TILES = 20       -- khoang cach duoi bat toi da (tiles)
+SIMBOT_CHASE_MAX_TICKS = 80       -- thoi gian duoi bat toi da (ticks)
+SIMBOT_RETREAT_HP_PCT = 25        -- nguong mau bat dau rut lui ve dong doi/doanh trai (%)
+SIMBOT_STUCK_THRESHOLD = 4        -- so tick dung im khi dang di chuyen de kich hoat go ket
+SIMBOT_CHAT_COOLDOWN = 30         -- gian cach chat the gioi cua bot (giay)
+SIMBOT_LLM_ENABLED = 0            -- co cho phep tich hop LLM ngoai hay khong (0=tat, 1=bat)
 
 -- PARAM setup
 PARAM_LIST_ID = 1                  -- param to store fighter id

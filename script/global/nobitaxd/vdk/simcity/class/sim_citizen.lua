@@ -8,6 +8,14 @@ SimCitizen.currentProcessGroup = 1 -- Add current group counter
 SimCitizen.totalFighters = 0 -- Track total fighters
 
 function SimCitizen:New(fighter)
+    if not fighter or not fighter.nMapId then
+        return nil
+    end
+
+    local worldInfo = SimCityWorld:Get(fighter.nMapId)
+    if worldInfo == nil then
+        return nil
+    end
 
     -- Setup minimum config
     self:initCharConfig(fighter)
@@ -29,22 +37,15 @@ function SimCitizen:New(fighter)
     local tbNpc = {
         id = nListId,
         children = nil,
-        worldInfo = SimCityWorld:Get(fighter.nMapId),
+        worldInfo = worldInfo,
         last2VisitedEdges = {}, -- Track last visited edges for more natural movement
         processGroup = processGroup -- Alternate between group 1 and 2
     }
 
-    -- Check if worldInfo is nil
-    if (tbNpc.worldInfo == nil) then
-        return nil
-    end
-
-
-    for k, v in fighter do
+    for k, v in pairs(fighter) do
         tbNpc[k] = v
     end
 
-    
     -- All good generate name for Thanh Thi
     if tbNpc.mode == nil or tbNpc.mode == "thanhthi" or tbNpc.mode == "train" then
         if tbNpc.worldInfo.showName == 1 then
@@ -60,15 +61,24 @@ function SimCitizen:New(fighter)
 
     -- Setup walk paths
     if tbNpc.movementSys:resetPos(self, nListId) == 0 then
+        -- Transactional rollback
+        self.fighterList[nListId] = nil
+        tinsert(self.removedIds, nListId)
+        self.totalFighters = self.totalFighters - 1
+        if self.totalFighters < 0 then self.totalFighters = 0 end
         return nil
     end
 
     -- Create the character on screen
     local canCreate = tbNpc.entitySys:CreateChar(self, tbNpc, 1, tbNpc.goX32, tbNpc.goY32)
     if canCreate == 0 then
+        -- Transactional rollback
+        self.fighterList[nListId] = nil
+        tinsert(self.removedIds, nListId)
+        self.totalFighters = self.totalFighters - 1
+        if self.totalFighters < 0 then self.totalFighters = 0 end
         return nil
     end
-
 
     -- What about childrenSetup?
     self:initChildrenConfig(nListId, fighter)

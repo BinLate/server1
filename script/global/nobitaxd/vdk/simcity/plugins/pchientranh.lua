@@ -47,26 +47,20 @@ end
 
 function SimCityChienTranh:genWalkPath(forCamp) 
 	local worldInfo = SimCityWorld:Get(self.nW)
-
-	
-	-- FIX: Luon luon camp1 (Tong) o duoi, camp2 (Kim) o tren
-	-- worldInfo.camp2TopRight = 1 (luon luon)
-	local myPath = {}
-	local mySpawnODuoi = 1
-	
-	-- Don gian: camp 1 = duoi, camp 2 = tren
-	if forCamp == 1 then
-		mySpawnODuoi = 1  -- Tong luon o duoi
-	else
-		mySpawnODuoi = 0  -- Kim luon o tren
+	if not worldInfo or not worldInfo.presetPaths then
+		return nil
 	end
 
+	local myPath = {}
+	local mySpawnODuoi = (forCamp == 1) and 1 or 0
 	local presetCampDuoiKey = worldInfo.presetPaths.baseDuoi
 	local presetCampTrenKey = worldInfo.presetPaths.baseTren 
+	if not presetCampDuoiKey or not presetCampTrenKey or getn(presetCampDuoiKey) == 0 or getn(presetCampTrenKey) == 0 then
+		return nil
+	end
 
 	if (mySpawnODuoi == 1) then
-		
-		if worldInfo.restrictedSpawns.campduoi then
+		if worldInfo.restrictedSpawns and worldInfo.restrictedSpawns.campduoi then
 			local filtered = {}
 			for i=1, getn(presetCampDuoiKey) do
 				local key = presetCampDuoiKey[i]
@@ -76,10 +70,12 @@ function SimCityChienTranh:genWalkPath(forCamp)
 			end
 			presetCampDuoiKey = filtered
 		end
+		if getn(presetCampDuoiKey) == 0 then return nil end
 
 		local mySpawn = presetCampDuoiKey[random(1, getn(presetCampDuoiKey))]
 		local theirSpawn = presetCampTrenKey[random(1, getn(presetCampTrenKey))]
 		local mainPath = SimCityGraphToChienTranh:autoFindPathNames(worldInfo, mySpawn, theirSpawn, 0)
+		if not mainPath then return nil end
 
  		tinsert(myPath, { mySpawn, 0 })
 		tinsert(myPath, { mainPath, 1})
@@ -87,8 +83,7 @@ function SimCityChienTranh:genWalkPath(forCamp)
 
 	-- My spawn o tren
 	else
-
-		if worldInfo.restrictedSpawns.camptren then
+		if worldInfo.restrictedSpawns and worldInfo.restrictedSpawns.camptren then
 			local filtered = {}
 			for i=1, getn(presetCampTrenKey) do
 				local key = presetCampTrenKey[i]
@@ -98,10 +93,13 @@ function SimCityChienTranh:genWalkPath(forCamp)
 			end	
 			presetCampTrenKey = filtered
 		end
+		if getn(presetCampTrenKey) == 0 then return nil end
 
 		local mySpawn = presetCampTrenKey[random(1, getn(presetCampTrenKey))]
 		local theirSpawn = presetCampDuoiKey[random(1, getn(presetCampDuoiKey))]
 		local mainPath = SimCityGraphToChienTranh:autoFindPathNames(worldInfo, mySpawn, theirSpawn, 1)
+		if not mainPath then return nil end
+
  		tinsert(myPath, { mySpawn, 0 })
 		tinsert(myPath, { mainPath, -1})
 		tinsert(myPath, { theirSpawn, 1 })
@@ -113,8 +111,13 @@ end
  
 
 function SimCityChienTranh:taoNV(id, camp, worldInfo, walkPathNames, nt, theosau, capHP, extraConfig)
-	if not walkPathNames then
+	if not worldInfo or not walkPathNames or getn(walkPathNames) == 0 then
 		return nil
+	end
+
+	if not worldInfo.graphEdges then
+		local res = SimCityGraphToChienTranh:build(worldInfo, 32)
+		if res == 0 then return nil end
 	end
 
 	local mapID = worldInfo.worldId
@@ -236,50 +239,57 @@ end
 
 function SimCityChienTranh:taophe(nW, camp, linhthuong1, linhthuong2, hieuuy, photuong, daituong, nguyensoai, kybinh)
 	local worldInfo = SimCityWorld:Get(nW)
+	if not worldInfo then return end
 
-	-- Doi 1: Nguyen Soai chi huy dai quan (1 Nguyen Soai + 1 Dai Tuong + 2 Pho Tuong + 3 Hieu Uy + 8 Binh Si = 15 bot)
-	self:taodoi(nguyensoai, camp, worldInfo, self:genWalkPath(camp), {
-		{ linhthuong1, 5 },
-		{ linhthuong2, 3 },
-		{ hieuuy,      3 },
-		{ photuong,    2 },
-		{ daituong,    1 },
-	})
+	if worldInfo.isTongKim == 1 then
+		if simTK and simTK.syncCampBots then
+			simTK:syncCampBots(nW, TONGKIM_SIMBOT_PER_CAMP or 5)
+		end
+		return
+	end
 
-	-- Doi 2: Dai Tuong tien phong (1 Dai Tuong + 1 Dai Tuong + 2 Pho Tuong + 3 Hieu Uy + 8 Binh Si = 15 bot)
-	self:taodoi(daituong, camp, worldInfo, self:genWalkPath(camp), {
-		{ linhthuong1, 5 },
-		{ linhthuong2, 3 },
-		{ hieuuy,      3 },
-		{ photuong,    2 },
-		{ daituong,    1 },
-	})
+	local path = self:genWalkPath(camp)
+	if path then
+		self:taodoi(nguyensoai, camp, worldInfo, path, {
+			{ linhthuong1, 2 },
+			{ linhthuong2, 1 },
+			{ hieuuy,      1 },
+		})
+	end
 end
 
 function SimCityChienTranh:phe_tudo(startNPCIndex, perPage, ngoaitrang)
+	local worldInfo = SimCityWorld:Get(self.nW)
+	if not worldInfo then return end
+
+	local maxTotal = (worldInfo.isTongKim == 1) and (TONGKIM_SIMBOT_TOTAL or 10) or 60
+	local maxPerCamp = (worldInfo.isTongKim == 1) and (TONGKIM_SIMBOT_PER_CAMP or 5) or 30
 	local currentBots = self:countMap(self.nW)
-	if currentBots >= 60 then
-		Msg2Player("Chien truong da du 60 Simbot (30 Tong / 30 Kim). Khong the trieu hoi them!")
+
+	if currentBots >= maxTotal then
+		Msg2Player(format("Chien truong da du %d Simbot (%d Tong / %d Kim). Khong the trieu hoi them!", maxTotal, maxPerCamp, maxPerCamp))
 		return 1
 	end
 
-	local worldInfo = SimCityWorld:Get(self.nW)
+	if worldInfo.isTongKim == 1 and simTK and simTK.syncCampBots then
+		simTK:syncCampBots(self.nW, maxPerCamp)
+		Msg2Player(format("Da trieu hoi Simbot Tong Kim (toi da %d Tong / %d Kim)!", maxPerCamp, maxPerCamp))
+		return 1
+	end
+
 	worldInfo.allowFighting = 1
 	worldInfo.showFightingArea = 0
 	local forCamp = 1
-	local maxAdd = (60 - currentBots)
+	local maxAdd = (maxTotal - currentBots)
 	if perPage > maxAdd then perPage = maxAdd end
 	for i = 0, perPage do
 		local id = startNPCIndex + i
 		if SimCityNPCInfo:IsValidFighter(id) == 1 then
 			local myPath = self:genWalkPath(forCamp)
-
-			local fighter = self:taoNV(id, forCamp, worldInfo, myPath, ngoaitrang or 0)
-			if fighter then
-				if forCamp == 1 then
-					forCamp = 2
-				else
-					forCamp = 1
+			if myPath then
+				local fighter = self:taoNV(id, forCamp, worldInfo, myPath, ngoaitrang or 0)
+				if fighter then
+					forCamp = (forCamp == 1) and 2 or 1
 				end
 			end
 		end
@@ -287,47 +297,50 @@ function SimCityChienTranh:phe_tudo(startNPCIndex, perPage, ngoaitrang)
 end
 
 function SimCityChienTranh:phe_tudo_xe(startNPCIndex, perPage, ngoaitrang)
- 
 	local worldInfo = SimCityWorld:Get(self.nW)
+	if not worldInfo then return end
+
+	if worldInfo.isTongKim == 1 then
+		if simTK and simTK.syncCampBots then
+			simTK:syncCampBots(self.nW, TONGKIM_SIMBOT_PER_CAMP or 5)
+		end
+		return
+	end
 
 	local forCamp = 1
-
 	local maxIndex = startNPCIndex + perPage
-
 	if maxIndex > SimCityNPCInfo.ALLNPCs_INFO_COUNT then
 		maxIndex = SimCityNPCInfo.ALLNPCs_INFO_COUNT
 	end
 
-	for i = 1, 10 do
+	for i = 1, 4 do
 		local pid = random(startNPCIndex, maxIndex)
 		local myPath = self:genWalkPath(forCamp)
-
-		while SimCityNPCInfo:notFightingChar(pid) == 1 do
-			pid = random(startNPCIndex, maxIndex)
-		end
-
-		-- 10 con theo sau
-		local runSpeed = SimCityNPCInfo:getSpeed(pid) or 0
-
-		local children = {}
-		while getn(children) < 20 do
-			local id = random(startNPCIndex, maxIndex)
-			local mySpeed = SimCityNPCInfo:getSpeed(id) or 0
-			if SimCityNPCInfo:notFightingChar(id) == 0 and (runSpeed == 0 or abs(mySpeed - runSpeed) <= 1) then
-				tinsert(children, {
-					nNpcId = id,
-					szName = (ngoaitrang == 1 and SimCityNPCInfo:generateName()) or SimCityNPCInfo:getName(id)
-				})
+		if myPath then
+			while SimCityNPCInfo:notFightingChar(pid) == 1 do
+				pid = random(startNPCIndex, maxIndex)
 			end
-		end
 
+			local runSpeed = SimCityNPCInfo:getSpeed(pid) or 0
+			local children = {}
+			while getn(children) < 3 do
+				local id = random(startNPCIndex, maxIndex)
+				local mySpeed = SimCityNPCInfo:getSpeed(id) or 0
+				if SimCityNPCInfo:notFightingChar(id) == 0 and (runSpeed == 0 or abs(mySpeed - runSpeed) <= 1) then
+					tinsert(children, {
+						nNpcId = id,
+						szName = (ngoaitrang == 1 and SimCityNPCInfo:generateName()) or SimCityNPCInfo:getName(id)
+					})
+				end
+			end
 
-		self:taoNV(pid, forCamp, worldInfo, myPath, ngoaitrang or 0, children, nil, {
-			childrenWalkMode = "random"
-		})
+			self:taoNV(pid, forCamp, worldInfo, myPath, ngoaitrang or 0, children, nil, {
+				childrenWalkMode = "random"
+			})
 
-		if i > 5 then
-			forCamp = 2
+			if i > 2 then
+				forCamp = 2
+			end
 		end
 	end
 end
@@ -426,22 +439,29 @@ function SimCityChienTranh:nv_tudo_xe(capHP)
 end
 
 function SimCityChienTranh:phe_quanbinh()
+	local worldInfo = SimCityWorld:Get(self.nW)
+	if worldInfo and worldInfo.isTongKim == 1 then
+		if simTK and simTK.syncCampBots then
+			simTK:syncCampBots(self.nW, TONGKIM_SIMBOT_PER_CAMP or 5)
+		end
+		Msg2Map(self.nW, format("Tong - Kim khai chien! Moi phe xuat quan chinh xac %d Chien binh!", TONGKIM_SIMBOT_PER_CAMP or 5))
+		return
+	end
+
 	-- Don dep bot cu tren map truoc khi xuat quan de khong bi trung lap
 	SimCitizen:ClearMap(self.nW, "chiendau")
 
-	-- PHE TONG BINH (30 bot)
 	local linh = 682
 	local kybinh = 1080
 	local camp = 1
 	self:taophe(self.nW, camp, linh, linh + 1, linh + 2, linh + 3, linh + 4, linh + 5, kybinh)
 
-	-- PHE KIM BINH (30 bot)
 	linh = 688
 	kybinh = 1090
 	camp = 2
 	self:taophe(self.nW, camp, linh, linh + 1, linh + 2, linh + 3, linh + 4, linh + 5, kybinh)
 
-	Msg2Map(self.nW, "Tong - Kim khai chien! Moi phe xuat quan chinh xac 30 Chien binh!")
+	Msg2Map(self.nW, "Khai chien! Quan binh da xuat tran!")
 end
 
 function SimCityChienTranh:removeAll(targetWorld)
@@ -664,7 +684,8 @@ end
 
 
 function SimCityChienTranh:taoHauDoanh(ngoaitrang)
-	if self:countMap(self.nW) >= 60 or self:countMapSpawn(self.nW) > 0 then
+	local maxTK = TONGKIM_SIMBOT_TOTAL or 10
+	if self:countMap(self.nW) >= maxTK or self:countMapSpawn(self.nW) > 0 then
 		return 1
 	end
 

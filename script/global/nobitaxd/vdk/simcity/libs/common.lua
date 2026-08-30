@@ -73,7 +73,7 @@ end
 function objCopy(obj)
     local output = {}
     if obj then
-        for k, v in obj do
+        for k, v in pairs(obj) do
             output[k] = v
         end
     end
@@ -95,11 +95,13 @@ function DelNpcSafe(nNpcIndex)
         return
     end
 
-    PIdx = NpcIdx2PIdx(nNpcIndex)
-    if (PIdx > 0) then
+    local pIdx = (NpcIdx2PIdx and NpcIdx2PIdx(nNpcIndex)) or 0
+    if (pIdx > 0) then
         return
     end
-    DelNpc(nNpcIndex)
+    if DelNpc then
+        DelNpc(nNpcIndex)
+    end
 end
 
 function IsAttackableCamp(camp1, camp2)
@@ -193,7 +195,7 @@ end
 
 function getObjectKeys(tbl)
     local result = {}
-    for k,v in tbl do
+    for k,v in pairs(tbl) do
         tinsert(result, k)
     end
     return result
@@ -208,7 +210,7 @@ function getClosestNode(nodes, nX, nY)
     local minDist1 = 200
     local closestNode1 = nil
 
-    for nodeName, coords in nodes do
+    for nodeName, coords in pairs(nodes) do
         local dist = GetDistanceRadius(nX, nY, coords[1], coords[2])
         if dist < minDist1 then
             minDist1 = dist

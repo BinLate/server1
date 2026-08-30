@@ -125,54 +125,57 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         maxCastTiles = SimProgression:GetSkillAttackRadiusTiles(skillId)
     end
 
+    local maxChaseTiles = SIMBOT_CHASE_MAX_TILES or 20
     local foundPlayerEnemy = tbNpc.isPlayerEnemyAround
-    if foundPlayerEnemy > 0 then
+    if foundPlayerEnemy and foundPlayerEnemy > 0 then
         local targetTileX, targetTileY, targetW = CallPlayerFunction(foundPlayerEnemy, GetWorldPos)
         if targetTileX and targetTileY and targetW == myW then
             local dist = GetDistanceRadius(myTileX, myTileY, targetTileX, targetTileY)
-            -- Neu ngoai tam danh (melee hoac ranged): Bat buoc chay lai gan truoc khi xuat chieu!
-            if dist > maxCastTiles then
+            if dist > maxChaseTiles then
+                tbNpc.isPlayerEnemyAround = 0
+            elseif dist > maxCastTiles then
                 if NpcRun then NpcRun(tbNpc.finalIndex, targetTileX, targetTileY) end
-                tbNpc.tick_canCast = tbNpc.tick_breath + 1 -- chay lai gan, KHONG danh gio
+                tbNpc.tick_canCast = tbNpc.tick_breath + 1
+                return
+            else
+                SimApplyHorseCombat(tbNpc, skillId)
+                if BotDoSkill and PIdx2NpcIdx then
+                    local _r = BotDoSkill(tbNpc.finalIndex, skillId, skillLevel, PIdx2NpcIdx(foundPlayerEnemy))
+                else
+                    NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, targetTileX*32, targetTileY*32)
+                end
+                local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
+                tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
+                if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc) end
                 return
             end
-
-            -- Da vao dung tam danh: Ap dung len/xuong ngua va xuat chieu
-            SimApplyHorseCombat(tbNpc, skillId)
-            if BotDoSkill and PIdx2NpcIdx then
-                local _r = BotDoSkill(tbNpc.finalIndex, skillId, skillLevel, PIdx2NpcIdx(foundPlayerEnemy))
-            else
-                NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, targetTileX*32, targetTileY*32)
-            end
-            local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
-            tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
-            if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc) end
-            return
+        else
+            tbNpc.isPlayerEnemyAround = 0
         end
     end
 
     local foundNpcEnemy = self:IsNpcEnemyAround(simInstance, tbNpc)
-    if foundNpcEnemy > 0 then
+    if foundNpcEnemy and foundNpcEnemy > 0 then
         local targetX32, targetY32, targetW = GetNpcPos(foundNpcEnemy)
         if targetX32 and targetY32 and targetW == myW then
             local targetTileX = floor(targetX32 / 32)
             local targetTileY = floor(targetY32 / 32)
             local dist = GetDistanceRadius(myTileX, myTileY, targetTileX, targetTileY)
 
-            -- Neu ngoai tam danh (melee hoac ranged): Bat buoc chay lai gan truoc khi xuat chieu!
-            if dist > maxCastTiles then
+            if dist > maxChaseTiles then
+                tbNpc.foundNpcEnemy = nil
+            elseif dist > maxCastTiles then
                 if NpcRun then NpcRun(tbNpc.finalIndex, targetTileX, targetTileY) end
-                tbNpc.tick_canCast = tbNpc.tick_breath + 1 -- chay lai gan, KHONG danh gio
+                tbNpc.tick_canCast = tbNpc.tick_breath + 1
+                return
+            else
+                SimApplyHorseCombat(tbNpc, skillId)
+                NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, targetX32, targetY32)
+                local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
+                tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
+                if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc) end
                 return
             end
-
-            -- Da vao dung tam danh: Ap dung len/xuong ngua va xuat chieu
-            SimApplyHorseCombat(tbNpc, skillId)
-            NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, targetX32, targetY32)
-            local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
-            tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
-            if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc) end
-            return
         end
     end
 end
@@ -267,7 +270,7 @@ function BuffChar(self, simInstance, tbNpc)
         end
     elseif tbNpc.skillHoTro and tbNpc.faction and tbNpc.skillHoTro > 0 then
        
-        if SimCityPhai[tbNpc.faction].noCast[tbNpc.skillHoTro]
+        if SimCityPhai[tbNpc.faction] and SimCityPhai[tbNpc.faction].noCast and SimCityPhai[tbNpc.faction].noCast[tbNpc.skillHoTro]
            and not (tbNpc.faction == "ngudoc" and (SimCityIsPeaceZone and SimCityIsPeaceZone(tbNpc) == 1)) then  
             if (SimCityPhai[tbNpc.faction].noCast[tbNpc.skillHoTro][1] == -999 or tbNpc.faction == "ngudoc")  
                 and tbNpc.isFighting == 0 and not tbNpc.partyPlayerId then   
@@ -282,7 +285,7 @@ function BuffChar(self, simInstance, tbNpc)
     end
 
     -- Tran phai
-    if SIMBOT_TRANPHAI == 1 and tbNpc.faction and SimCityPhai[tbNpc.faction].needCast
+    if SIMBOT_TRANPHAI == 1 and tbNpc.faction and SimCityPhai[tbNpc.faction] and SimCityPhai[tbNpc.faction].needCast
         and (SimCityCanFight and SimCityCanFight(tbNpc) == 1)  
         and (not tbNpc.tranPhaiTick or tbNpc.tranPhaiTick <= tbNpc.tick_breath) then   
         tbNpc.tranPhaiTick = tbNpc.tick_breath + 60*18/REFRESH_RATE 

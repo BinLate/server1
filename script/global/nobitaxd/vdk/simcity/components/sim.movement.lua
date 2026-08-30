@@ -299,7 +299,7 @@ SimMovement.Citizen = {
             local currentPath = tbNpc.worldInfo.presetPaths[tbNpc.currentPathIndex]
             local currentNodeName = currentPath[tbNpc.currentPointIndex]
             local nodes = {}
-            for k,v in tbNpc.worldInfo.nodes do
+            for k,v in pairs(tbNpc.worldInfo.nodes) do
                 if v.nodeType == 1 then
                     nodes[k] = {v.x, v.y, v.linkedNodes}
                 end
@@ -599,14 +599,14 @@ SimMovement.Citizen = {
         
         -- Otherwise pick a random node
         local nodeCount = 0
-        for id, _ in tbNpc.worldInfo.nodes do
+        for id, _ in pairs(tbNpc.worldInfo.nodes) do
             nodeCount = nodeCount + 1
         end
         if nodeCount == 0 then return nil end
 
         local targetIndex = random(1, nodeCount)
         local currentIndex = 0
-        for id, _ in tbNpc.worldInfo.nodes do
+        for id, _ in pairs(tbNpc.worldInfo.nodes) do
             currentIndex = currentIndex + 1
             if currentIndex == targetIndex then
                 return id
@@ -648,11 +648,15 @@ SimMovement.Citizen = {
                     tbNpc.tick_canWalk = tbNpc.tick_breath + random(TONGKIM_SPAWN_MINSTAY, TONGKIM_SPAWN_MAXSTAY)*18/REFRESH_RATE
                     if (tbNpc.tongkim == 1) then
                         tbNpc.currentPointIndex = random(1, pathLength)
-
-                        local node = getNodeInfoByNodeName(tbNpc, tbNpc.worldInfo.presetPaths[tbNpc.currentPathIndex][tbNpc.currentPointIndex])
-                        local targetPos = randomRange({node.x, node.y}, tbNpc.walkVar or 4)
-                        tbNpc.goX32 = targetPos[1]*32
-                        tbNpc.goY32 = targetPos[2]*32
+                        local curP = tbNpc.worldInfo.presetPaths and tbNpc.worldInfo.presetPaths[tbNpc.currentPathIndex]
+                        if curP and curP[tbNpc.currentPointIndex] then
+                            local node = getNodeInfoByNodeName(tbNpc, curP[tbNpc.currentPointIndex])
+                            if node and node.x and node.y then
+                                local targetPos = randomRange({node.x, node.y}, tbNpc.walkVar or 4)
+                                tbNpc.goX32 = targetPos[1]*32
+                                tbNpc.goY32 = targetPos[2]*32
+                            end
+                        end
                     end
                 else
                     tbNpc.currentPathIndex = pathNames[tbNpc.hardsetPathIndex or random(1, pathCount)]

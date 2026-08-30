@@ -81,7 +81,7 @@ function SimCore:initCharConfig(config)
     end
 
     if config.faction then
-        if (SimCityPhai[config.faction] and SimCityPhai[config.faction].knownIds[config.nNpcId]) then
+        if (SimCityPhai[config.faction] and SimCityPhai[config.faction].knownIds and SimCityPhai[config.faction].knownIds[config.nNpcId]) then
        
             config.series = SimCityPhai[config.faction].knownIds[config.nNpcId].series
 
@@ -180,13 +180,18 @@ end
 
 
 function SimCore:Remove(nListId)
+    if not nListId then return end
     local tbNpc = self.fighterList[nListId]
     if tbNpc then
         DelNpcSafe(tbNpc.finalIndex)
 
         if tbNpc.children then
-            for i = 1, getn(tbNpc.children) do
-                self:Remove(tbNpc.children[i])
+            local ch = tbNpc.children
+            tbNpc.children = nil
+            for i = 1, getn(ch) do
+                if ch[i] then
+                    self:Remove(ch[i])
+                end
             end
         end
 
@@ -195,6 +200,7 @@ function SimCore:Remove(nListId)
         
         -- Decrement total fighters
         self.totalFighters = self.totalFighters - 1
+        if self.totalFighters < 0 then self.totalFighters = 0 end
     end
 end
 

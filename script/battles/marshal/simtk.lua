@@ -218,17 +218,24 @@ function simTK:removeSimTK(mapid)
 	SimCityChienTranh:removeAll(mapid)	
 end
 function simTK:add_npc_simcity_by_camp(nIdMap,nIdNpc,forCamp)
+	local maxPerCamp = TONGKIM_SIMBOT_PER_CAMP or 5
+	if self:countBotsByCamp(nIdMap, forCamp) >= maxPerCamp then
+		return nil
+	end
 	SimCityChienTranh:init(nIdMap)
 	local worldInfo = SimCityWorld:Get(nIdMap)
-	local myPath = {}
-	if isGioCaoDiem() == 1 then
-		--myPath = SimCityChienTranh:genWalkPath_TK(forCamp)
-		myPath = SimCityChienTranh:genWalkPath(forCamp)
-	else
-		myPath = SimCityChienTranh:genWalkPath(forCamp)
+	if not worldInfo then return nil end
+	if not worldInfo.presetPaths or not worldInfo.chienTranhPaths then
+		if SimCityGraphToChienTranh and SimCityGraphToChienTranh.build then
+			local buildRes = SimCityGraphToChienTranh:build(worldInfo, 32)
+			if buildRes == 0 then return nil end
+		end
 	end
 
-	local fighter = SimCityChienTranh:taoNV_TK(nIdNpc, forCamp, worldInfo, myPath, 1)	
+	local myPath = SimCityChienTranh:genWalkPath(forCamp)
+	if not myPath then return nil end
+
+	return SimCityChienTranh:taoNV_TK(nIdNpc, forCamp, worldInfo, myPath, 1)
 end
 function simTK:call_npc_simcity(nIdMap,startNPCIndex, stopNPCIndex, nCount ,ngoaitrang)
 	local nIdNpc = startNPCIndex
@@ -246,7 +253,7 @@ function simTK:countBotsByCamp(idMap, camp)
 	local counter = 0
 	if SimCitizen and SimCitizen.fighterList then
 		for k, v in SimCitizen.fighterList do
-			if v.nMapId and v.nMapId == idMap and v.camp == camp and v.tongkim == 1 then
+			if v.nMapId and v.nMapId == idMap and v.camp == camp and v.tongkim == 1 and (v.isDead ~= 1) and (not v.finalIndex or v.finalIndex > 0) then
 				counter = counter + 1
 			end
 		end
@@ -269,7 +276,7 @@ function simTK:trimCampBots(idMap, camp, maxAllowed)
 	if not SimCitizen or not SimCitizen.fighterList then return end
 	local toRemove = {}
 	for k, v in SimCitizen.fighterList do
-		if v.nMapId and v.nMapId == idMap and v.camp == camp and v.tongkim == 1 then
+		if v.nMapId and v.nMapId == idMap and v.camp == camp and v.tongkim == 1 and (v.isDead ~= 1) and (not v.finalIndex or v.finalIndex > 0) then
 			tinsert(toRemove, v.id)
 		end
 	end
@@ -283,7 +290,7 @@ function simTK:trimCampBots(idMap, camp, maxAllowed)
 end
 
 function simTK:syncCampBots(idMap, maxPerCamp)
-	maxPerCamp = maxPerCamp or 5
+	maxPerCamp = maxPerCamp or TONGKIM_SIMBOT_PER_CAMP or 5
 	for camp = 1, 2 do
 		local count = self:countBotsByCamp(idMap, camp)
 		if count < maxPerCamp then
@@ -295,13 +302,13 @@ function simTK:syncCampBots(idMap, maxPerCamp)
 end
 
 function simTK:add_npc_simcity(idMap)
-	self:syncCampBots(idMap, 5)
+	self:syncCampBots(idMap, TONGKIM_SIMBOT_PER_CAMP or 5)
 	local _wi = SimCityWorld:Get(idMap)
 	if _wi then _wi.tkWarStarted = 0 end
 end
 
 function simTK:ensureBots(idMap)
-	self:syncCampBots(idMap, 5)
+	self:syncCampBots(idMap, TONGKIM_SIMBOT_PER_CAMP or 5)
 	local _wi = SimCityWorld:Get(idMap)
 	if _wi then _wi.tkWarStarted = 1 end
 end

@@ -385,7 +385,7 @@ function SimProgression:UpdateBotSkills(tbNpc)
 
     if not branch or not facTable[branch] then
         local firstBranch = nil
-        for bName, _ in facTable do
+        for bName, _ in pairs(facTable) do
             firstBranch = bName
             break
         end
@@ -542,7 +542,9 @@ function SimProgression:ApplyGearByLevel(tbNpc, nNpcIndex)
     if SetNpcRideHorse then
         SetNpcRideHorse(nNpcIndex, isRide)
     end
-end\n\n-- 9. LOGIC THEM EXP VA THANG CAP
+end
+
+-- 9. LOGIC THEM EXP VA THANG CAP
 function SimProgression:AddExp(tbNpc, nExp)
     if not tbNpc or not nExp or nExp <= 0 then return end
     tbNpc.level = tbNpc.level or 1
