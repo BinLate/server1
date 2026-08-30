@@ -5,6 +5,25 @@ if not GetNpcAroundNpcList then
     end
 end
 
+function split(szFullString, szSeparator)
+    if not szFullString or szFullString == "" then return {} end
+    szSeparator = szSeparator or "_"
+    local nFindStartIndex = 1
+    local nSplitIndex = 1
+    local nSplitArray = {}
+    while true do
+        local nFindLastIndex = strfind(szFullString, szSeparator, nFindStartIndex, 1)
+        if not nFindLastIndex then
+            nSplitArray[nSplitIndex] = strsub(szFullString, nFindStartIndex, strlen(szFullString))
+            break
+        end
+        nSplitArray[nSplitIndex] = strsub(szFullString, nFindStartIndex, nFindLastIndex - 1)
+        nFindStartIndex = nFindLastIndex + strlen(szSeparator)
+        nSplitIndex = nSplitIndex + 1
+    end
+    return nSplitArray
+end
+
 -- Helpers
 function GetTabFileData(path, tab_name, start_row, max_col) -- Doc file txt
     if TabFile_Load(path, tab_name) ~= 1 then

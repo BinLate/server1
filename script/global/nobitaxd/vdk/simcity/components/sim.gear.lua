@@ -232,11 +232,15 @@ function SimGear:GetCastCooldownTicks(tbNpc)
     end
 end
 
-function SimGear:ApplyCombatLeech(tbNpc)
+function SimGear:ApplyCombatLeech(tbNpc, targetIdx, targetType)
     if not tbNpc or not tbNpc.finalIndex or tbNpc.finalIndex <= 0 then return end
     if not tbNpc.virtualGear then return end
     local tier = tbNpc.virtualGear.tier or 1
     if tier < 5 then return end -- Chi do cap 5x tro len moi co dong Hut Sinh Luc
+
+    -- Gate leech on valid target and confirmed hit probability (70% hit rate)
+    if not targetIdx or targetIdx <= 0 then return end
+    if random(1, 100) > 70 then return end
 
     local leechRate = tier * 0.006 -- 3% toi 7.2%
     local curHp = (NPCINFO_GetNpcCurrentLife and NPCINFO_GetNpcCurrentLife(tbNpc.finalIndex)) or tbNpc.lastHP or 0

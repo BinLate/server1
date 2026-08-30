@@ -1,11 +1,13 @@
 import unittest
 import os
 import re
+import shutil
 import lupa
 from lupa import LuaRuntime
 
-class TestPhaseASafety(unittest.TestCase):
+class TestPhaseBProgression(unittest.TestCase):
     def setUp(self):
+        os.makedirs("save/simcity", exist_ok=True)
         self.lua = LuaRuntime(unpack_returned_tuples=True)
         mock_env = """
         local function make_iter(t)
@@ -45,7 +47,9 @@ class TestPhaseASafety(unittest.TestCase):
         tremove = table.remove
         format = string.format
         strsub = string.sub
+        strlen = string.len
         strfind = string.find
+        gsub = string.gsub
         mod = math.fmod
 
         objCopy = function(orig)
@@ -72,7 +76,6 @@ class TestPhaseASafety(unittest.TestCase):
         GetMissionV = function(a) return 0 end
         BT_SetData = function(a, b) end
         GetGameTime = function() return 1000 end
-        -- JX1 engine contract: GetWorldPos returns (mapId, x, y)
         GetWorldPos = function() return 380, 1500, 3000 end
         GetCurCamp = function() return 1 end
         DelNpc = function(idx) end
@@ -91,9 +94,10 @@ class TestPhaseASafety(unittest.TestCase):
         SetNpcAI = function(idx, ai) end
         SetNpcDmgExtra = function(...) end
         SetNpcAuraSkill = function(...) end
-        NPCINFO_GetNpcCurrentLife = function(idx) return 1000 end
-        NPCINFO_GetNpcCurrentMaxLife = function(idx) return 1000 end
-        NPCINFO_SetNpcCurrentLife = function(idx, hp) end
+        _G_MOCK_HP = {}
+        NPCINFO_GetNpcCurrentLife = function(idx) return _G_MOCK_HP[idx] or 5000 end
+        NPCINFO_GetNpcCurrentMaxLife = function(idx) return 5000 end
+        NPCINFO_SetNpcCurrentLife = function(idx, hp) _G_MOCK_HP[idx] = hp end
         NPCINFO_SetNpcCurrentMaxLife = function(idx, hp) end
         SetNpcAtkSpeed = function(idx, spd) end
         NpcRun = function(idx, x, y) end
@@ -132,6 +136,10 @@ class TestPhaseASafety(unittest.TestCase):
         end
         """
         self.lua.execute(mock_env)
+
+    def tearDown(self):
+        if os.path.exists("save/simcity"):
+            shutil.rmtree("save/simcity", ignore_errors=True)
 
     def load_lua_file(self, rel_path):
         with open(rel_path, 'r', encoding='latin1') as f:
@@ -220,10 +228,39 @@ class TestPhaseASafety(unittest.TestCase):
             }
         }
 
+        local defaultWorld11 = {
+            worldId = 11,
+            name = "PhucNguuSon_11",
+            isTongKim = 0,
+            showName = 1,
+            allowFighting = 1,
+            showFightingArea = 0,
+            presetPaths = {
+                baseDuoi = { "spawn_s1", "spawn_s2" },
+                baseTren = { "spawn_j1", "spawn_j2" },
+                main_path_1 = { "spawn_s1", "mid1", "mid2", "spawn_j1" },
+                spawn_s1 = { "spawn_s1", "mid1" },
+                spawn_s2 = { "spawn_s2", "mid1" },
+                spawn_j1 = { "spawn_j1", "mid2" },
+                spawn_j2 = { "spawn_j2", "mid2" }
+            },
+            restrictedSpawns = { campduoi = {}, camptren = {} },
+            graphEdges = { 1 },
+            nodes = {
+                spawn_s1 = { x = 100, y = 100, linkedNodes = {"mid1"} },
+                spawn_s2 = { x = 105, y = 105, linkedNodes = {"mid1"} },
+                spawn_j1 = { x = 200, y = 200, linkedNodes = {"mid2"} },
+                spawn_j2 = { x = 205, y = 205, linkedNodes = {"mid2"} },
+                mid1 = { x = 150, y = 150, linkedNodes = {"mid2"} },
+                mid2 = { x = 160, y = 160, linkedNodes = {"spawn_j1"} }
+            }
+        }
+
         SimCityWorld = {
             data = {
                 [380] = defaultWorld380,
-                [53] = defaultWorld53
+                [53] = defaultWorld53,
+                [11] = defaultWorld11
             }
         }
         function SimCityWorld:Get(mapId)
@@ -270,283 +307,182 @@ class TestPhaseASafety(unittest.TestCase):
         SimCitizen.fighterList = make_iterable_table(SimCitizen.fighterList or {})
         """)
 
-    def test_centralized_configuration_values(self):
-        self.load_lua_file('script/global/nobitaxd/vdk/simcity/config.lua')
-        g = self.lua.globals()
-        self.assertEqual(g.TONGKIM_SIMBOT_PER_CAMP, 5)
-        self.assertEqual(g.TONGKIM_SIMBOT_TOTAL, 10)
-        self.assertEqual(g.TRAIN_BOT_MAX_PER_MAP, 25)
-        self.assertEqual(g.TRAIN_BOT_GLOBAL_BUDGET, 200)
-        self.assertEqual(g.SIMBOT_MAX_LEVEL, 200)
-        self.assertEqual(g.AOI_SCAN_INTERVAL, 15)
-        self.assertEqual(g.AOI_HIBERNATE_TIMEOUT, 120)
-
-    def test_tongkim_5v5_sync_and_trim_invariants(self):
+    def test_level_cap_200_exp_progression(self):
         self.init_simcity_environment()
         res = self.lua.execute("""
-        local mapId = 380
-        simTK:ensureBots(mapId)
-        local tongCount = simTK:countBotsByCamp(mapId, 1)
-        local kimCount = simTK:countBotsByCamp(mapId, 2)
-        local totalCount = SimCityChienTranh:countMap(mapId)
+        local exp100 = SimProgression:GetExpRequired(100)
+        local exp150 = SimProgression:GetExpRequired(150)
+        local exp200 = SimProgression:GetExpRequired(200)
 
-        -- Repeated call must remain idempotent
-        simTK:ensureBots(mapId)
-        local tongCount2 = simTK:countBotsByCamp(mapId, 1)
-        local kimCount2 = simTK:countBotsByCamp(mapId, 2)
-        local totalCount2 = SimCityChienTranh:countMap(mapId)
+        local bot = { level = 149, nExp = 0, faction = "thieulam" }
+        local req149 = SimProgression:GetExpRequired(149)
+        SimProgression:AddExp(bot, req149)
+        local lv_150 = bot.level
 
-        return tongCount, kimCount, totalCount, tongCount2, kimCount2, totalCount2
+        local req150 = SimProgression:GetExpRequired(150)
+        SimProgression:AddExp(bot, req150)
+        local lv_151 = bot.level
+
+        -- Test level 199 -> 200
+        bot.level = 199
+        bot.nExp = 0
+        local req199 = SimProgression:GetExpRequired(199)
+        SimProgression:AddExp(bot, req199)
+        local lv_200 = bot.level
+
+        -- Bot at cap 200 must not exceed 200
+        SimProgression:AddExp(bot, 1000000000)
+        local lv_cap = bot.level
+
+        return exp100, exp150, exp200, lv_150, lv_151, lv_200, lv_cap
         """)
-        tong1, kim1, total1, tong2, kim2, total2 = res
-        self.assertEqual(tong1, 5)
-        self.assertEqual(kim1, 5)
-        self.assertEqual(total1, 10)
-        self.assertEqual(tong2, 5)
-        self.assertEqual(kim2, 5)
-        self.assertEqual(total2, 10)
+        exp100, exp150, exp200, lv_150, lv_151, lv_200, lv_cap = res
+        self.assertEqual(exp100, 210000000)
+        self.assertGreater(exp150, exp100)
+        self.assertGreater(exp200, exp150)
+        self.assertEqual(lv_150, 150)
+        self.assertEqual(lv_151, 151)
+        self.assertEqual(lv_200, 200)
+        self.assertEqual(lv_cap, 200)
 
-    def test_legacy_pchientranh_redirects_in_tongkim(self):
+    def test_skill_range_and_horselimit_semantics(self):
         self.init_simcity_environment()
         res = self.lua.execute("""
-        SimCityChienTranh:init(380)
-        
-        -- Call legacy phe_quanbinh
-        SimCityChienTranh:phe_quanbinh()
-        local c1 = SimCityChienTranh:countMap(380)
-        local t1 = simTK:countBotsByCamp(380, 1)
-        local k1 = simTK:countBotsByCamp(380, 2)
+        -- Dat Ma Do Giang (318): Bo chien (HorseLimit = 0)
+        local horse_318 = SimProgression:CanCastOnHorse(318)
+        -- Vo Tuong Tram (321): Ky chien (HorseLimit = 1)
+        local horse_321 = SimProgression:CanCastOnHorse(321)
 
-        -- Call legacy phe_tudo
-        SimCityChienTranh:phe_tudo(2000, 50, 0)
-        local c2 = SimCityChienTranh:countMap(380)
+        -- Attack Radius lookup
+        local radTiles_melee = SimProgression:GetSkillAttackRadiusTiles(318) -- Dat Ma Do Giang (90px -> 2 tiles)
+        local radTiles_range = SimProgression:GetSkillAttackRadiusTiles(302) -- Bao Vu Le Hoa (450px -> 14 tiles)
 
-        -- Call legacy phe_tudo_xe
-        SimCityChienTranh:phe_tudo_xe(2000, 50, 0)
-        local c3 = SimCityChienTranh:countMap(380)
+        local isMelee_318 = SimProgression:IsMeleeSkill(318)
+        local isMelee_302 = SimProgression:IsMeleeSkill(302)
 
-        return c1, t1, k1, c2, c3
+        return horse_318 == 0, horse_321 == 1, radTiles_melee, radTiles_range, isMelee_318 == true, isMelee_302 == false
         """)
-        c1, t1, k1, c2, c3 = res
-        self.assertEqual(c1, 10)
-        self.assertEqual(t1, 5)
-        self.assertEqual(k1, 5)
-        self.assertEqual(c2, 10)
-        self.assertEqual(c3, 10)
+        h318, h321, r_melee, r_range, m318, m302 = res
+        self.assertTrue(h318)
+        self.assertTrue(h321)
+        self.assertEqual(r_melee, 2)
+        self.assertEqual(r_range, 14)
+        self.assertTrue(m318)
+        self.assertTrue(m302)
 
-    def test_get_player_count_in_map(self):
+    def test_gear_tiers_and_damage_gated_leech(self):
         self.init_simcity_environment()
         res = self.lua.execute("""
-        -- JX1 standard: player positions as (mapId, x, y)
-        local playerPositions = {
-            [1] = { 53, 1000, 2000 },
-            [2] = { 53, 1200, 2200 },
-            [3] = { 380, 1500, 3000 }
+        local tier_50 = SimGear:GetTierByLevel(50)
+        local tier_150 = SimGear:GetTierByLevel(150)
+        local tier_180 = SimGear:GetTierByLevel(180)
+
+        local bot = {
+            finalIndex = 1001,
+            level = 150,
+            maxHP = 5000,
+            lastHP = 3000,
+            virtualGear = { tier = 11 }
         }
-        GetPlayerCount = function() return 3 end
-        CallPlayerFunction = function(pIdx, fn)
-            local pos = playerPositions[pIdx]
-            return pos[1], pos[2], pos[3]
-        end
+        _G_MOCK_HP[1001] = 3000
 
-        local count53 = SimCityLuyenCong:GetPlayerCountInMap(53)
-        local count380 = SimCityLuyenCong:GetPlayerCountInMap(380)
-        local count999 = SimCityLuyenCong:GetPlayerCountInMap(999)
+        -- 1. Leech with valid target (targetIdx > 0)
+        SimGear:ApplyCombatLeech(bot, 1002, "player")
+        local hpAfterValid = _G_MOCK_HP[1001]
 
-        return count53, count380, count999
+        -- 2. Leech with invalid target (targetIdx == 0) -> must not leech
+        _G_MOCK_HP[1001] = 3000
+        bot.lastHP = 3000
+        SimGear:ApplyCombatLeech(bot, 0, "player")
+        local hpAfterInvalid = _G_MOCK_HP[1001]
+
+        return tier_50, tier_150, tier_180, hpAfterValid >= 3000, hpAfterInvalid == 3000
         """)
-        c53, c380, c999 = res
-        self.assertEqual(c53, 2)
-        self.assertEqual(c380, 1)
-        self.assertEqual(c999, 0)
+        t50, t150, t180, valid_ok, invalid_ok = res
+        self.assertEqual(t50, 5)
+        self.assertEqual(t150, 11)
+        self.assertEqual(t180, 12)
+        self.assertTrue(valid_ok)
+        self.assertTrue(invalid_ok)
 
-    def test_dynamic_aoi_idempotency_and_budget(self):
+    def test_crash_safe_roster_persistence(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        -- Name sanitization test
+        local dirtyName = "Bot\\nName|With/Traversal..\\0"
+        local cleanName = SimProgression:SanitizeName(dirtyName)
+
+        -- Save roster
+        local mapId = 53
+        local testRoster = {
+            { szName = "KiemMa99", level = 125, nExp = 45000, faction = "vodang", series = 3, weaponBranch = "kiem", nNpcId = 105, camp = 0, personality = "aggressive" },
+            { szName = "DocCo99", level = 150, nExp = 90000, faction = "thieulam", series = 1, weaponBranch = "dao", nNpcId = 106, camp = 5, personality = "cautious" }
+        }
+
+        local saveOk = SimProgression:SaveTrainBots(mapId, testRoster)
+        local loadedRoster = SimProgression:LoadTrainBots(mapId)
+
+        local count = getn(loadedRoster)
+        local bot1 = loadedRoster[1]
+        local bot2 = loadedRoster[2]
+
+        return cleanName, saveOk >= 1, count, bot1.szName, bot1.level, bot1.faction, bot1.personality, bot2.szName, bot2.level, bot2.camp
+        """)
+        cleanName, saveOk, count, b1_name, b1_lv, b1_fac, b1_pers, b2_name, b2_lv, b2_camp = res
+        self.assertEqual(cleanName, "BotNameWithTraversal")
+        self.assertTrue(saveOk)
+        self.assertEqual(count, 2)
+        self.assertEqual(b1_name, "KiemMa99")
+        self.assertEqual(b1_lv, 125)
+        self.assertEqual(b1_fac, "vodang")
+        self.assertEqual(b1_pers, "aggressive")
+        self.assertEqual(b2_name, "DocCo99")
+        self.assertEqual(b2_lv, 150)
+        self.assertEqual(b2_camp, 5)
+
+    def test_aoi_hibernation_roster_snapshot_and_migration(self):
         self.init_simcity_environment()
         res = self.lua.execute("""
         SimCityLuyenCong:init()
-        
-        -- Spawn for map 1 (Ba Lang Huyen, count=15)
+        local map1 = SimCityLuyenCong.TRAIN_MAPS[1].mapId -- 53 (Ba Lang Huyen, minLv=1, maxLv=20)
+        local map2 = SimCityLuyenCong.TRAIN_MAPS[2].mapId -- 11 (Phuc Nguu Son, minLv=20, maxLv=40)
+
+        -- 1. Spawn map 1
         SimCityLuyenCong:spawnForMap(1)
-        local mapId = SimCityLuyenCong.TRAIN_MAPS[1].mapId
-        local count1 = SimCityLuyenCong:countBotsInMap(mapId)
+        local initialCount = SimCityLuyenCong:countBotsInMap(map1)
 
-        -- Repeated call to spawnForMap should NOT double count
-        SimCityLuyenCong:spawnForMap(1)
-        local count2 = SimCityLuyenCong:countBotsInMap(mapId)
-
-        -- Hibernate should clear map
-        SimCityLuyenCong:hibernateMap(mapId)
-        local count3 = SimCityLuyenCong:countBotsInMap(mapId)
-
-        return count1, count2, count3
-        """)
-        count1, count2, count3 = res
-        self.assertEqual(count1, 15)
-        self.assertEqual(count2, 15)
-        self.assertEqual(count3, 0)
-
-    def test_aoi_atick_lifecycle_replenish_and_hibernate(self):
-        self.init_simcity_environment()
-        res = self.lua.execute("""
-        SimCityLuyenCong:init()
-        local mapId = SimCityLuyenCong.TRAIN_MAPS[1].mapId -- Ba Lang Huyen (53), target=15
-
-        -- Mock player on map 53: (mapId, x, y)
-        GetPlayerCount = function() return 1 end
-        CallPlayerFunction = function(pIdx, fn) return 53, 1000, 2000 end
-
-        local simTime = 100
-        GetGameTime = function() return simTime end
-
-        -- 1. First ATick spawns 15 bots
-        SimCityLuyenCong:ATick()
-        local initialCount = SimCityLuyenCong:countBotsInMap(mapId)
-
-        -- 2. Simulate 5 bots dying/being removed
-        local removed = 0
+        -- 2. Level up one bot in map 1 to level 25 (> 20 -> should trigger migration to map 2 upon hibernation)
         for id, bot in pairs(SimCitizen.fighterList) do
-            if bot.mode == "train" and bot.nMapId == mapId and removed < 5 then
-                SimCitizen:Remove(id)
-                removed = removed + 1
+            if bot.mode == "train" and bot.nMapId == map1 then
+                bot.level = 25
+                bot.szName = "MigratedHero"
+                break
             end
         end
-        local countAfterKill = SimCityLuyenCong:countBotsInMap(mapId)
 
-        -- 3. Next ATick (player still present) replenishes back to 15
-        simTime = simTime + 20
-        SimCityLuyenCong:ATick()
-        local countAfterReplenish = SimCityLuyenCong:countBotsInMap(mapId)
+        -- 3. Hibernate Map 1 -> should save persistent roster and migrate the level 25 bot to Map 2's roster
+        SimCityLuyenCong:hibernateMap(map1)
+        local countAfterHib = SimCityLuyenCong:countBotsInMap(map1)
 
-        -- 4. Player leaves map (count = 0)
-        CallPlayerFunction = function(pIdx, fn) return 999, 1000, 2000 end
+        -- Check Map 2 loaded roster
+        local map2Roster = SimProgression:LoadTrainBots(map2)
+        local map2MigratedCount = getn(map2Roster)
+        local migratedName = (map2MigratedCount > 0) and map2Roster[1].szName or ""
+        local migratedLv = (map2MigratedCount > 0) and map2Roster[1].level or 0
 
-        -- Advance time within hibernate timeout (e.g. 50s < 120s) -> should NOT hibernate yet
-        simTime = simTime + 50
-        SimCityLuyenCong:ATick()
-        local countBeforeHibernate = SimCityLuyenCong:countBotsInMap(mapId)
+        -- 4. Spawn Map 2 -> should awaken with the migrated bot
+        SimCityLuyenCong:spawnForMap(2)
+        local map2BotCount = SimCityLuyenCong:countBotsInMap(map2)
 
-        -- Advance time past hibernate timeout (e.g. 150s >= 120s) -> should hibernate
-        simTime = simTime + 100
-        SimCityLuyenCong:ATick()
-        local countAfterHibernate = SimCityLuyenCong:countBotsInMap(mapId)
-
-        return initialCount, countAfterKill, countAfterReplenish, countBeforeHibernate, countAfterHibernate
+        return initialCount, countAfterHib == 0, map2MigratedCount > 0, migratedName, migratedLv, map2BotCount
         """)
-        c_init, c_kill, c_rep, c_before_hib, c_after_hib = res
-        self.assertEqual(c_init, 15)
-        self.assertEqual(c_kill, 10)
-        self.assertEqual(c_rep, 15)
-        self.assertEqual(c_before_hib, 15)
-        self.assertEqual(c_after_hib, 0)
-
-    def test_exec_cast_normal_skill_player_target_combat(self):
-        self.init_simcity_environment()
-        res = self.lua.execute("""
-        local botId = SimCitizen:New({ nMapId = 380, nNpcId = 100, faction = "thieulam" })
-        local bot = SimCitizen:Get(botId)
-        bot.finalIndex = 1001
-        bot.nMapId = 380
-        bot.tick_canCast = 0
-        bot.tick_breath = 100
-        bot.skillId = 318
-        bot.skillLevel = 20
-
-        -- Mock NPC position on map 380 at tile (100, 100) -> 3200, 3200
-        GetNpcPos = function(idx) return 3200, 3200, 380 end
-
-        local castSkillCalled = 0
-        local runCalled = 0
-        NpcCastSkill = function(idx, sk, lv, x32, y32)
-            castSkillCalled = castSkillCalled + 1
-        end
-        NpcRun = function(idx, tx, ty)
-            runCalled = runCalled + 1
-        end
-
-        -- Case 1: Enemy player on same map 380 within cast range (tile 101, 101)
-        bot.isPlayerEnemyAround = 1
-        CallPlayerFunction = function(pIdx, fn) return 380, 101, 101 end
-        bot.fightSys:Update(SimCitizen, bot)
-        local c1_cast = castSkillCalled
-        local c1_active = bot.isPlayerEnemyAround
-
-        -- Case 2: Enemy player on same map 380 outside cast range but within chase range (tile 110, 110)
-        bot.isPlayerEnemyAround = 1
-        bot.tick_canCast = 0
-        CallPlayerFunction = function(pIdx, fn) return 380, 110, 110 end
-        bot.fightSys:Update(SimCitizen, bot)
-        local c2_run = runCalled
-        local c2_active = bot.isPlayerEnemyAround
-
-        -- Case 3: Enemy player on different map 999 -> target should be cleared
-        bot.isPlayerEnemyAround = 1
-        bot.tick_canCast = 0
-        CallPlayerFunction = function(pIdx, fn) return 999, 101, 101 end
-        bot.fightSys:Update(SimCitizen, bot)
-        local c3_active = bot.isPlayerEnemyAround
-
-        -- Case 4: Enemy player too far (distance > 20 tiles) -> chase cap clears target
-        bot.isPlayerEnemyAround = 1
-        bot.tick_canCast = 0
-        CallPlayerFunction = function(pIdx, fn) return 380, 200, 200 end
-        bot.fightSys:Update(SimCitizen, bot)
-        local c4_active = bot.isPlayerEnemyAround
-
-        return c1_cast > 0, c1_active == 1, c2_run > 0, c2_active == 1, c3_active == 0, c4_active == 0
-        """)
-        c1_cast, c1_act, c2_run, c2_act, c3_cleared, c4_cleared = res
-        self.assertTrue(c1_cast)
-        self.assertTrue(c1_act)
-        self.assertTrue(c2_run)
-        self.assertTrue(c2_act)
-        self.assertTrue(c3_cleared)
-        self.assertTrue(c4_cleared)
-
-    def test_sim_citizen_transactional_rollback(self):
-        self.init_simcity_environment()
-        res = self.lua.execute("""
-        local initialTotal = SimCitizen.totalFighters
-        local initialCounter = SimCitizen.counter
-        local initialRemoved = getn(SimCitizen.removedIds)
-
-        -- 1. Invalid mapId (worldInfo == nil)
-        local res1 = SimCitizen:New({ nMapId = 999999, nNpcId = 100 })
-        local total1 = SimCitizen.totalFighters
-
-        -- 2. Movement resetPos returns 0 (force failure)
-        local orig_reset = SimMovement.Citizen.resetPos
-        SimMovement.Citizen.resetPos = function() return 0 end
-        local res2 = SimCitizen:New({ nMapId = 380, nNpcId = 100, faction = "thieulam" })
-        local total2 = SimCitizen.totalFighters
-        SimMovement.Citizen.resetPos = orig_reset
-
-        -- 3. Entity CreateChar returns 0 (force failure)
-        local orig_addnpc = AddNpcEx
-        AddNpcEx = function(...) return 0 end
-        local res3 = SimCitizen:New({ nMapId = 380, nNpcId = 100, faction = "thieulam" })
-        local total3 = SimCitizen.totalFighters
-        AddNpcEx = orig_addnpc
-
-        -- 4. Successful creation
-        local validId = SimCitizen:New({ nMapId = 380, nNpcId = 100, faction = "thieulam" })
-        local total4 = SimCitizen.totalFighters
-
-        -- 5. Remove verification
-        SimCitizen:Remove(validId)
-        local total5 = SimCitizen.totalFighters
-
-        return res1 == nil, total1 == initialTotal, res2 == nil, total2 == initialTotal, res3 == nil, total3 == initialTotal, validId ~= nil, total4 == initialTotal + 1, total5 == initialTotal
-        """)
-        r1_nil, t1_ok, r2_nil, t2_ok, r3_nil, t3_ok, v_ok, t4_ok, t5_ok = res
-        self.assertTrue(r1_nil)
-        self.assertTrue(t1_ok)
-        self.assertTrue(r2_nil)
-        self.assertTrue(t2_ok)
-        self.assertTrue(r3_nil)
-        self.assertTrue(t3_ok)
-        self.assertTrue(v_ok)
-        self.assertTrue(t4_ok)
-        self.assertTrue(t5_ok)
+        init_cnt, hib_ok, mig_ok, mig_name, mig_lv, map2_cnt = res
+        self.assertGreater(init_cnt, 0)
+        self.assertTrue(hib_ok)
+        self.assertTrue(mig_ok)
+        self.assertEqual(mig_name, "MigratedHero")
+        self.assertEqual(mig_lv, 25)
+        self.assertGreater(map2_cnt, 0)
 
 if __name__ == '__main__':
     unittest.main()

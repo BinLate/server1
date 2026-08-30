@@ -72,7 +72,8 @@ function execCreateChar(self, simInstance, tbNpc, isNew, goX32, goY32)
 			name = tbNpc.hardsetName     
 		end
 
-        local _spawnLv = (tbNpc.level and tbNpc.level >= 1 and tbNpc.level <= 180) and tbNpc.level or 95
+        local _maxLv = SIMBOT_MAX_LEVEL or 200
+        local _spawnLv = (tbNpc.level and tbNpc.level >= 1 and tbNpc.level <= _maxLv) and tbNpc.level or 95
         tbNpc.level = _spawnLv
         nNpcIndex = AddNpcEx(tbNpc.nNpcId, _spawnLv, tbNpc.series, nMapIndex, tX32, tY32, 1, name, 0)
 
@@ -81,7 +82,12 @@ function execCreateChar(self, simInstance, tbNpc, isNew, goX32, goY32)
             if kind ~= 0 then
                 DelNpcSafe(nNpcIndex)
             else
-                tbNpc.szName = GetNpcName(nNpcIndex)
+                local realName = (GetNpcName and GetNpcName(nNpcIndex))
+                if realName and realName ~= "" and realName ~= " " and realName ~= "Bot" then
+                    tbNpc.szName = realName
+                else
+                    tbNpc.szName = name
+                end
                 tbNpc.finalIndex = nNpcIndex
                 tbNpc.isDead = 0
                 tbNpc.lastPos = {
