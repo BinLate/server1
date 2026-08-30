@@ -7,6 +7,7 @@ from lupa import LuaRuntime
 class TestPhaseASafety(unittest.TestCase):
     def setUp(self):
         self.lua = LuaRuntime(unpack_returned_tuples=True)
+        self.lua.globals().os_replace = os.replace
         mock_env = """
         local function make_iter(t)
             return setmetatable(t or {}, {
@@ -127,8 +128,12 @@ class TestPhaseASafety(unittest.TestCase):
             if f then f:write(str) end
         end
         renamefile = function(oldp, newp)
-            pcall(os.remove, newp)
-            return os.rename(oldp, newp)
+            if os_replace then
+                local ok, err = pcall(os_replace, oldp, newp)
+                if ok then return 1 else return nil, err end
+            end
+            local ok, err = os.rename(oldp, newp)
+            if ok then return 1 else return nil, err end
         end
         """
         self.lua.execute(mock_env)

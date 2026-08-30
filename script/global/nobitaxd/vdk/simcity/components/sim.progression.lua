@@ -633,6 +633,9 @@ local function _sim_write(f, str)
     if write then return write(f, str) end
     if f.write then return f:write(str) end
 end
+-- Helper function for atomic file rename
+-- On Linux / POSIX game server (GLIBC), rename(2) is guaranteed atomic and replaces existing destination files
+-- on the same filesystem without requiring pre-deletion. renamefile in JX1 C-engine maps directly to this syscall.
 local function _sim_rename(oldp, newp)
     if renamefile then
         local r1, r2 = pcall(renamefile, oldp, newp)

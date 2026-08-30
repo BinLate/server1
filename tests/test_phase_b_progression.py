@@ -9,6 +9,7 @@ class TestPhaseBProgression(unittest.TestCase):
     def setUp(self):
         os.makedirs("save/simcity", exist_ok=True)
         self.lua = LuaRuntime(unpack_returned_tuples=True)
+        self.lua.globals().os_replace = os.replace
         mock_env = """
         local function make_iter(t)
             return setmetatable(t or {}, {
@@ -131,8 +132,12 @@ class TestPhaseBProgression(unittest.TestCase):
             if f then f:write(str) end
         end
         renamefile = function(oldp, newp)
-            pcall(os.remove, newp)
-            return os.rename(oldp, newp)
+            if os_replace then
+                local ok, err = pcall(os_replace, oldp, newp)
+                if ok then return 1 else return nil, err end
+            end
+            local ok, err = os.rename(oldp, newp)
+            if ok then return 1 else return nil, err end
         end
         """
         self.lua.execute(mock_env)
@@ -573,6 +578,53 @@ class TestPhaseBProgression(unittest.TestCase):
         self.assertEqual(count, 1)
         self.assertEqual(bot1_name, "OldHero1")
         self.assertFalse(tmp_exists)
+
+    def test_crash_safe_roster_atomic_overwrite_of_existing_file(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local mapId = 53
+
+        -- 1. Save Roster A
+        local rosterA = {
+            { szName = "HeroAlpha", level = 100, nExp = 5000, faction = "thieulam", series = 1, weaponBranch = "dao", nNpcId = 101, camp = 0, personality = "balanced" }
+        }
+        local saveOkA = SimProgression:SaveTrainBots(mapId, rosterA)
+
+        -- 2. Confirm Roster A is readable
+        local loadedA = SimProgression:LoadTrainBots(mapId)
+        local countA = getn(loadedA)
+        local nameA = countA > 0 and loadedA[1].szName or ""
+        local lvA = countA > 0 and loadedA[1].level or 0
+
+        -- 3. Save Roster B to the exact same mapId (replacing existing roster file atomically)
+        local rosterB = {
+            { szName = "HeroBeta", level = 150, nExp = 25000, faction = "vodang", series = 3, weaponBranch = "kiem", nNpcId = 105, camp = 5, personality = "aggressive" }
+        }
+        local saveOkB = SimProgression:SaveTrainBots(mapId, rosterB)
+
+        -- 4. Confirm Roster B was loaded, count is 1, and only HeroBeta exists
+        local loadedB = SimProgression:LoadTrainBots(mapId)
+        local countB = getn(loadedB)
+        local nameB = countB > 0 and loadedB[1].szName or ""
+        local lvB = countB > 0 and loadedB[1].level or 0
+
+        -- 5. Confirm no .tmp file remains on disk
+        local tmpFile = io.open("save/simcity/train_map_53.dat.tmp", "r")
+        local tmpExists = tmpFile ~= nil
+        if tmpFile then tmpFile:close() end
+
+        return saveOkA == 1, countA, nameA, lvA, saveOkB == 1, countB, nameB, lvB, tmpExists
+        """)
+        okA, cntA, nmA, lvA, okB, cntB, nmB, lvB, tmpExists = res
+        self.assertTrue(okA)
+        self.assertEqual(cntA, 1)
+        self.assertEqual(nmA, "HeroAlpha")
+        self.assertEqual(lvA, 100)
+        self.assertTrue(okB)
+        self.assertEqual(cntB, 1)
+        self.assertEqual(nmB, "HeroBeta")
+        self.assertEqual(lvB, 150)
+        self.assertFalse(tmpExists)
 
 if __name__ == '__main__':
     unittest.main()
