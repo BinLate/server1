@@ -51,13 +51,13 @@ function SimCityLuyenCong:GetPlayerCountInMap(nMapId)
     if total <= 0 then return 0 end
 
     for i = 1, total do
-        local pX, pY, pW = nil, nil, nil
+        local pW, pX, pY = nil, nil, nil
         if CallPlayerFunction then
-            pX, pY, pW = CallPlayerFunction(i, GetWorldPos)
+            pW, pX, pY = CallPlayerFunction(i, GetWorldPos)
         else
             local oldPIdx = PlayerIndex
             PlayerIndex = i
-            pX, pY, pW = GetWorldPos()
+            pW, pX, pY = GetWorldPos()
             PlayerIndex = oldPIdx
         end
         if pW == nMapId then

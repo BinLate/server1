@@ -70,8 +70,8 @@ class TestPhaseASafety(unittest.TestCase):
         GetMissionV = function(a) return 0 end
         BT_SetData = function(a, b) end
         GetGameTime = function() return 1000 end
-        -- JX1 engine standard: GetWorldPos returns (x, y, mapId)
-        GetWorldPos = function() return 1500, 3000, 380 end
+        -- JX1 engine contract: GetWorldPos returns (mapId, x, y)
+        GetWorldPos = function() return 380, 1500, 3000 end
         GetCurCamp = function() return 1 end
         DelNpc = function(idx) end
         GetNpcPos = function(idx) return 3200, 3200, 380 end
@@ -316,11 +316,11 @@ class TestPhaseASafety(unittest.TestCase):
     def test_get_player_count_in_map(self):
         self.init_simcity_environment()
         res = self.lua.execute("""
-        -- Mock 3 players in world: P1 on map 53, P2 on map 53, P3 on map 380
+        -- JX1 standard: player positions as (mapId, x, y)
         local playerPositions = {
-            [1] = { 1000, 2000, 53 },
-            [2] = { 1200, 2200, 53 },
-            [3] = { 1500, 3000, 380 }
+            [1] = { 53, 1000, 2000 },
+            [2] = { 53, 1200, 2200 },
+            [3] = { 380, 1500, 3000 }
         }
         GetPlayerCount = function() return 3 end
         CallPlayerFunction = function(pIdx, fn)
@@ -370,9 +370,9 @@ class TestPhaseASafety(unittest.TestCase):
         SimCityLuyenCong:init()
         local mapId = SimCityLuyenCong.TRAIN_MAPS[1].mapId -- Ba Lang Huyen (53), target=15
 
-        -- Mock player on map 53
+        -- Mock player on map 53: (mapId, x, y)
         GetPlayerCount = function() return 1 end
-        CallPlayerFunction = function(pIdx, fn) return 1000, 2000, 53 end
+        CallPlayerFunction = function(pIdx, fn) return 53, 1000, 2000 end
 
         local simTime = 100
         GetGameTime = function() return simTime end
@@ -397,7 +397,7 @@ class TestPhaseASafety(unittest.TestCase):
         local countAfterReplenish = SimCityLuyenCong:countBotsInMap(mapId)
 
         -- 4. Player leaves map (count = 0)
-        CallPlayerFunction = function(pIdx, fn) return 1000, 2000, 999 end
+        CallPlayerFunction = function(pIdx, fn) return 999, 1000, 2000 end
 
         -- Advance time within hibernate timeout (e.g. 50s < 120s) -> should NOT hibernate yet
         simTime = simTime + 50
