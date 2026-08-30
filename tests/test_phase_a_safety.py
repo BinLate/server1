@@ -70,7 +70,8 @@ class TestPhaseASafety(unittest.TestCase):
         GetMissionV = function(a) return 0 end
         BT_SetData = function(a, b) end
         GetGameTime = function() return 1000 end
-        GetWorldPos = function() return 380, 1500, 3000 end
+        -- JX1 engine standard: GetWorldPos returns (x, y, mapId)
+        GetWorldPos = function() return 1500, 3000, 380 end
         GetCurCamp = function() return 1 end
         DelNpc = function(idx) end
         GetNpcPos = function(idx) return 3200, 3200, 380 end
@@ -312,6 +313,32 @@ class TestPhaseASafety(unittest.TestCase):
         self.assertEqual(c2, 10)
         self.assertEqual(c3, 10)
 
+    def test_get_player_count_in_map(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        -- Mock 3 players in world: P1 on map 53, P2 on map 53, P3 on map 380
+        local playerPositions = {
+            [1] = { 1000, 2000, 53 },
+            [2] = { 1200, 2200, 53 },
+            [3] = { 1500, 3000, 380 }
+        }
+        GetPlayerCount = function() return 3 end
+        CallPlayerFunction = function(pIdx, fn)
+            local pos = playerPositions[pIdx]
+            return pos[1], pos[2], pos[3]
+        end
+
+        local count53 = SimCityLuyenCong:GetPlayerCountInMap(53)
+        local count380 = SimCityLuyenCong:GetPlayerCountInMap(380)
+        local count999 = SimCityLuyenCong:GetPlayerCountInMap(999)
+
+        return count53, count380, count999
+        """)
+        c53, c380, c999 = res
+        self.assertEqual(c53, 2)
+        self.assertEqual(c380, 1)
+        self.assertEqual(c999, 0)
+
     def test_dynamic_aoi_idempotency_and_budget(self):
         self.init_simcity_environment()
         res = self.lua.execute("""
@@ -337,6 +364,60 @@ class TestPhaseASafety(unittest.TestCase):
         self.assertEqual(count2, 15)
         self.assertEqual(count3, 0)
 
+    def test_aoi_atick_lifecycle_replenish_and_hibernate(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        SimCityLuyenCong:init()
+        local mapId = SimCityLuyenCong.TRAIN_MAPS[1].mapId -- Ba Lang Huyen (53), target=15
+
+        -- Mock player on map 53
+        GetPlayerCount = function() return 1 end
+        CallPlayerFunction = function(pIdx, fn) return 1000, 2000, 53 end
+
+        local simTime = 100
+        GetGameTime = function() return simTime end
+
+        -- 1. First ATick spawns 15 bots
+        SimCityLuyenCong:ATick()
+        local initialCount = SimCityLuyenCong:countBotsInMap(mapId)
+
+        -- 2. Simulate 5 bots dying/being removed
+        local removed = 0
+        for id, bot in pairs(SimCitizen.fighterList) do
+            if bot.mode == "train" and bot.nMapId == mapId and removed < 5 then
+                SimCitizen:Remove(id)
+                removed = removed + 1
+            end
+        end
+        local countAfterKill = SimCityLuyenCong:countBotsInMap(mapId)
+
+        -- 3. Next ATick (player still present) replenishes back to 15
+        simTime = simTime + 20
+        SimCityLuyenCong:ATick()
+        local countAfterReplenish = SimCityLuyenCong:countBotsInMap(mapId)
+
+        -- 4. Player leaves map (count = 0)
+        CallPlayerFunction = function(pIdx, fn) return 1000, 2000, 999 end
+
+        -- Advance time within hibernate timeout (e.g. 50s < 120s) -> should NOT hibernate yet
+        simTime = simTime + 50
+        SimCityLuyenCong:ATick()
+        local countBeforeHibernate = SimCityLuyenCong:countBotsInMap(mapId)
+
+        -- Advance time past hibernate timeout (e.g. 150s >= 120s) -> should hibernate
+        simTime = simTime + 100
+        SimCityLuyenCong:ATick()
+        local countAfterHibernate = SimCityLuyenCong:countBotsInMap(mapId)
+
+        return initialCount, countAfterKill, countAfterReplenish, countBeforeHibernate, countAfterHibernate
+        """)
+        c_init, c_kill, c_rep, c_before_hib, c_after_hib = res
+        self.assertEqual(c_init, 15)
+        self.assertEqual(c_kill, 10)
+        self.assertEqual(c_rep, 15)
+        self.assertEqual(c_before_hib, 15)
+        self.assertEqual(c_after_hib, 0)
+
     def test_sim_citizen_transactional_rollback(self):
         self.init_simcity_environment()
         res = self.lua.execute("""
@@ -355,24 +436,33 @@ class TestPhaseASafety(unittest.TestCase):
         local total2 = SimCitizen.totalFighters
         SimMovement.Citizen.resetPos = orig_reset
 
-        -- 3. Successful creation
-        local validId = SimCitizen:New({ nMapId = 380, nNpcId = 100, faction = "thieulam" })
+        -- 3. Entity CreateChar returns 0 (force failure)
+        local orig_addnpc = AddNpcEx
+        AddNpcEx = function(...) return 0 end
+        local res3 = SimCitizen:New({ nMapId = 380, nNpcId = 100, faction = "thieulam" })
         local total3 = SimCitizen.totalFighters
+        AddNpcEx = orig_addnpc
 
-        -- 4. Remove verification
-        SimCitizen:Remove(validId)
+        -- 4. Successful creation
+        local validId = SimCitizen:New({ nMapId = 380, nNpcId = 100, faction = "thieulam" })
         local total4 = SimCitizen.totalFighters
 
-        return res1 == nil, total1 == initialTotal, res2 == nil, total2 == initialTotal, validId ~= nil, total3 == initialTotal + 1, total4 == initialTotal
+        -- 5. Remove verification
+        SimCitizen:Remove(validId)
+        local total5 = SimCitizen.totalFighters
+
+        return res1 == nil, total1 == initialTotal, res2 == nil, total2 == initialTotal, res3 == nil, total3 == initialTotal, validId ~= nil, total4 == initialTotal + 1, total5 == initialTotal
         """)
-        r1_nil, t1_ok, r2_nil, t2_ok, v_ok, t3_ok, t4_ok = res
+        r1_nil, t1_ok, r2_nil, t2_ok, r3_nil, t3_ok, v_ok, t4_ok, t5_ok = res
         self.assertTrue(r1_nil)
         self.assertTrue(t1_ok)
         self.assertTrue(r2_nil)
         self.assertTrue(t2_ok)
-        self.assertTrue(v_ok)
+        self.assertTrue(r3_nil)
         self.assertTrue(t3_ok)
+        self.assertTrue(v_ok)
         self.assertTrue(t4_ok)
+        self.assertTrue(t5_ok)
 
 if __name__ == '__main__':
     unittest.main()

@@ -51,13 +51,13 @@ function SimCityLuyenCong:GetPlayerCountInMap(nMapId)
     if total <= 0 then return 0 end
 
     for i = 1, total do
-        local pW, pX, pY = nil, nil, nil
+        local pX, pY, pW = nil, nil, nil
         if CallPlayerFunction then
-            pW, pX, pY = CallPlayerFunction(i, GetWorldPos)
+            pX, pY, pW = CallPlayerFunction(i, GetWorldPos)
         else
             local oldPIdx = PlayerIndex
             PlayerIndex = i
-            pW, pX, pY = GetWorldPos()
+            pX, pY, pW = GetWorldPos()
             PlayerIndex = oldPIdx
         end
         if pW == nMapId then
@@ -215,13 +215,11 @@ function SimCityLuyenCong:ATick()
 
         if pCount > 0 then
             state.lastPlayerSeen = curTime
-            if state.isSpawned == 0 then
-                self:spawnForMap(i)
-            end
+            self:spawnForMap(i)
         else
             if state.isSpawned == 1 then
                 local idleTime = curTime - state.lastPlayerSeen
-                if idleTime >= self.hibernateTimeout then
+                if idleTime >= timeout then
                     self:hibernateMap(mapId)
                 end
             end
