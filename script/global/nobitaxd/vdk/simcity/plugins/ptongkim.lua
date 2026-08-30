@@ -434,9 +434,6 @@ function SimCityTongKim:onPlayerEnterMap(pW)
 	-- Neu tim thay Quan Nhu Quan thi them vao Trieu Man va Vo Ky
 	if tmpFound then
 		AddTimer(18*2, "SimCityTongKim:addTongKimNpcByPlayer", PlayerIndex)
-		if simTK and simTK.ensureBots then
-			simTK:ensureBots(pW)
-		end
 	end
 
 end

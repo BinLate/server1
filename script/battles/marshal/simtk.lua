@@ -217,15 +217,25 @@ function simTK:removeSimTK(mapid)
 	--print("remove simTK in mapid "..mapid)
 	SimCityChienTranh:removeAll(mapid)	
 end
-function simTK:add_npc_simcity_by_camp(nIdMap,nIdNpc,forCamp)
+function simTK:add_npc_simcity_by_camp(nIdMap, nIdNpc, forCamp)
 	SimCityChienTranh:init(nIdMap)
 	local worldInfo = SimCityWorld:Get(nIdMap)
-	if not worldInfo then return end
-	if not worldInfo.chienTranhPaths or not worldInfo.presetPaths or not worldInfo.presetPaths.baseDuoi or not worldInfo.presetPaths.baseTren then
+	if not worldInfo then return nil end
+
+	if not worldInfo.presetPaths or not worldInfo.presetPaths.baseDuoi or not worldInfo.presetPaths.baseTren then
 		if SimCityGraphToChienTranh and SimCityGraphToChienTranh.build then
-			SimCityGraphToChienTranh:build(worldInfo, 32)
+			local result = SimCityGraphToChienTranh:build(worldInfo, 32)
+			if result == 0
+				or not worldInfo.presetPaths
+				or not worldInfo.presetPaths.baseDuoi
+				or not worldInfo.presetPaths.baseTren
+				or getn(worldInfo.presetPaths.baseDuoi) == 0
+				or getn(worldInfo.presetPaths.baseTren) == 0 then
+				return nil
+			end
 		end
 	end
+
 	local myPath = {}
 	if isGioCaoDiem() == 1 then
 		--myPath = SimCityChienTranh:genWalkPath_TK(forCamp)
@@ -233,8 +243,11 @@ function simTK:add_npc_simcity_by_camp(nIdMap,nIdNpc,forCamp)
 	else
 		myPath = SimCityChienTranh:genWalkPath(forCamp)
 	end
+	if not myPath or getn(myPath) == 0 then
+		return nil
+	end
 
-	local fighter = SimCityChienTranh:taoNV_TK(nIdNpc, forCamp, worldInfo, myPath, 1)	
+	return SimCityChienTranh:taoNV_TK(nIdNpc, forCamp, worldInfo, myPath, 1)
 end
 function simTK:call_npc_simcity(nIdMap,startNPCIndex, stopNPCIndex, nCount ,ngoaitrang)
 	local nIdNpc = startNPCIndex
