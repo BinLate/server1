@@ -642,12 +642,6 @@ local function _sim_rename(oldp, newp)
     if os and os.rename then
         local ok, err = os.rename(oldp, newp)
         if ok then return 1 end
-        -- On platforms where os.rename fails if destination exists (e.g. Windows), fallback safely
-        if os.remove then
-            pcall(os.remove, newp)
-            local ok2 = os.rename(oldp, newp)
-            if ok2 then return 1 end
-        end
     end
     return 0
 end
