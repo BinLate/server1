@@ -636,13 +636,20 @@ end
 local function _sim_rename(oldp, newp)
     if renamefile then
         local r1, r2 = pcall(renamefile, oldp, newp)
-        if r1 and r2 then return r2 end
+        if r1 and (r2 == 1 or r2 == true) then return 1 end
+        return 0
     end
     if os and os.rename then
-        if os.remove then pcall(os.remove, newp) end
         local ok, err = os.rename(oldp, newp)
-        return ok
+        if ok then return 1 end
+        -- On platforms where os.rename fails if destination exists (e.g. Windows), fallback safely
+        if os.remove then
+            pcall(os.remove, newp)
+            local ok2 = os.rename(oldp, newp)
+            if ok2 then return 1 end
+        end
     end
+    return 0
 end
 
 function SimProgression:SaveTrainBots(mapId, botList)
@@ -680,7 +687,12 @@ function SimProgression:SaveTrainBots(mapId, botList)
     end
 
     _sim_close(f)
-    _sim_rename(szTmpPath, szPath)
+    local renOk = _sim_rename(szTmpPath, szPath)
+    if renOk ~= 1 then
+        if removefile then pcall(removefile, szTmpPath) end
+        if os and os.remove then pcall(os.remove, szTmpPath) end
+        return 0
+    end
     return 1
 end
 

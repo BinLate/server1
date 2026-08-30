@@ -146,7 +146,7 @@ function execCastNormalSkill(self, simInstance, tbNpc)
                 end
                 local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
                 tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
-                if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, foundPlayerEnemy, "player") end
+                if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, foundNpcEnemy, "npc") end
                 if SimProgression and SimProgression.AddExp and tbNpc.mode == "train" then
                     SimProgression:AddExp(tbNpc, (tbNpc.level or 1) * 20)
                 end
@@ -176,7 +176,7 @@ function execCastNormalSkill(self, simInstance, tbNpc)
                 NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, targetX32, targetY32)
                 local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
                 tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
-                if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, foundPlayerEnemy, "player") end
+                if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, foundNpcEnemy, "npc") end
                 if SimProgression and SimProgression.AddExp and tbNpc.mode == "train" then
                     SimProgression:AddExp(tbNpc, (tbNpc.level or 1) * 20)
                 end

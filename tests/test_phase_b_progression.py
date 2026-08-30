@@ -484,5 +484,95 @@ class TestPhaseBProgression(unittest.TestCase):
         self.assertEqual(mig_lv, 25)
         self.assertGreater(map2_cnt, 0)
 
+    def test_npc_target_combat_leech_invocation(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local targetIdxPassed = nil
+        local targetTypePassed = nil
+        SimGear.ApplyCombatLeech = function(self, tbNpc, targetIdx, targetType)
+            targetIdxPassed = targetIdx
+            targetTypePassed = targetType
+        end
+
+        local tbNpc = {
+            finalIndex = 1001,
+            faction = "vodang",
+            weaponBranch = "kiem",
+            level = 100,
+            nMapId = 53,
+            series = 3,
+            mode = "train",
+            ngoaitrang = 1,
+            horse = 0,
+            tick_breath = 100,
+            tick_canCast = 0,
+            isFighting = 1,
+            goX32 = 1000,
+            goY32 = 1000
+        }
+
+        GetNpcAroundNpcList = function(idx, radius)
+            return { 2002 } -- Found NPC enemy 2002
+        end
+        IsPlayer = function(idx) return 0 end
+        NPCINFO_GetNpcRelation = function(a, b) return 0 end -- 0 = enemy
+        GetNpcPos = function(idx) return 1020, 1020 end
+        NpcCastSkill = function(...) return 1 end
+
+        local mockFightSys = {
+            IsPlayerEnemyAround = function(self, inst, npc) return 0 end,
+            IsNpcEnemyAround = function(self, inst, npc) return 2002 end,
+            SetNpcEnemyTarget = function(self, inst, npc, target) end
+        }
+        execCastNormalSkill(mockFightSys, nil, tbNpc)
+        return targetIdxPassed, targetTypePassed
+        """)
+        target_idx, target_type = res
+        self.assertEqual(target_idx, 2002)
+        self.assertEqual(target_type, "npc")
+
+    def test_crash_safe_roster_failure_path_preserves_old_data(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local mapId = 53
+        local initialRoster = {
+            { szName = "OldHero1", level = 100, nExp = 1000, faction = "thieulam", series = 1, weaponBranch = "dao", nNpcId = 101, camp = 0, personality = "balanced" }
+        }
+        -- 1. Initial valid save
+        local initialSaveOk = SimProgression:SaveTrainBots(mapId, initialRoster)
+
+        -- 2. Mock rename failure for next save
+        local old_rename = renamefile
+        renamefile = function(oldp, newp)
+            return nil, "Disk full / rename error"
+        end
+
+        local failedRoster = {
+            { szName = "CorruptedHero", level = 999, nExp = 0, faction = "ngami", series = 2, weaponBranch = "kiem", nNpcId = 102, camp = 1, personality = "aggressive" }
+        }
+        local failedSaveRet = SimProgression:SaveTrainBots(mapId, failedRoster)
+
+        -- Restore renamefile
+        renamefile = old_rename
+
+        -- 3. Verify that old valid roster remains intact on disk
+        local currentRoster = SimProgression:LoadTrainBots(mapId)
+        local count = getn(currentRoster)
+        local bot1 = currentRoster[1]
+
+        -- 4. Verify tmp file cleaned up
+        local tmpFile = io.open("save/simcity/train_map_53.dat.tmp", "r")
+        local tmpExists = tmpFile ~= nil
+        if tmpFile then tmpFile:close() end
+
+        return initialSaveOk == 1, failedSaveRet, count, bot1 and bot1.szName, tmpExists
+        """)
+        init_ok, failed_ret, count, bot1_name, tmp_exists = res
+        self.assertTrue(init_ok)
+        self.assertEqual(failed_ret, 0)
+        self.assertEqual(count, 1)
+        self.assertEqual(bot1_name, "OldHero1")
+        self.assertFalse(tmp_exists)
+
 if __name__ == '__main__':
     unittest.main()
