@@ -377,6 +377,9 @@ function SimCityTongKim:addTongKimNpcByPlayer(pId)
 		--	SimCityChienTranh:nv_tudo(1)
 		--end
 
+		if simTK and simTK.ensureBots then
+			simTK:ensureBots(pW)
+		end
 		-- Add hau doanh
 		SimCityChienTranh:taoHauDoanh(1)		
 	end
@@ -431,7 +434,7 @@ function SimCityTongKim:onPlayerEnterMap(pW)
 	-- Neu tim thay Quan Nhu Quan thi them vao Trieu Man va Vo Ky
 	if tmpFound then
 		AddTimer(18*2, "SimCityTongKim:addTongKimNpcByPlayer", PlayerIndex)
-		if simTK and simTK.ensureBots and GetMissionV and GetMissionV(1) == 2 then
+		if simTK and simTK.ensureBots then
 			simTK:ensureBots(pW)
 		end
 	end

@@ -135,11 +135,11 @@ function OnTimer()
 	--if (t >= RUNGAME_TIME) then
 	--	AddTeTan(t)  -- 增加宋金特探
 		
-		if (t == RUNGAME_TIME) then --正式开战的第一次触发时，产生战斗Npc的生成规则数据
+		if (t == RUNGAME_TIME) then
 			if lsf_level == 3 then
-				--sf_buildfightnpcdata() --tat NPC trong map TongKim
-				-- elseif lsf_level == 3 then				
-				-- (DOI) simTK:add_npc_simcity da chuyen len block PRE-SPAWN (truoc khai chien) o tren
+				if simTK and simTK.ensureBots then
+					simTK:ensureBots(BT_GetGameData(GAME_MAPID))
+				end
 			end
 		else
 			--到开战后半小时看双方总积分，积分小的一方产生元帅

@@ -220,6 +220,12 @@ end
 function simTK:add_npc_simcity_by_camp(nIdMap,nIdNpc,forCamp)
 	SimCityChienTranh:init(nIdMap)
 	local worldInfo = SimCityWorld:Get(nIdMap)
+	if not worldInfo then return end
+	if not worldInfo.chienTranhPaths or not worldInfo.presetPaths or not worldInfo.presetPaths.baseDuoi or not worldInfo.presetPaths.baseTren then
+		if SimCityGraphToChienTranh and SimCityGraphToChienTranh.build then
+			SimCityGraphToChienTranh:build(worldInfo, 32)
+		end
+	end
 	local myPath = {}
 	if isGioCaoDiem() == 1 then
 		--myPath = SimCityChienTranh:genWalkPath_TK(forCamp)
@@ -246,14 +252,14 @@ function simTK:countBotsByCamp(idMap, camp)
 	local counter = 0
 	if SimCitizen and SimCitizen.fighterList then
 		for k, v in SimCitizen.fighterList do
-			if v.nMapId and v.nMapId == idMap and v.camp == camp and v.tongkim == 1 then
+			if v.nMapId and v.nMapId == idMap and v.camp == camp and v.tongkim == 1 and v.finalIndex and v.finalIndex > 0 then
 				counter = counter + 1
+
 			end
 		end
 	end
 	return counter
 end
-
 function simTK:spawnCampBots(idMap, camp, count)
 	local nIdNpc = 2000
 	for i = 1, count do

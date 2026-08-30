@@ -12,7 +12,7 @@ function SimCityChienTranh:init(idMap)
 	elseif idMap == 379 then
 		self.nW = 379
 	else 
-		self.nW = 380
+		self.nW = idMap or 380
 	end
 end
 function createTaskSayChienTranh(mapId, extra)
