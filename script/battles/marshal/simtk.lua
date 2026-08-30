@@ -298,7 +298,7 @@ function simTK:trimCampBots(idMap, camp, maxAllowed)
 	if not SimCitizen or not SimCitizen.fighterList then return end
 	local toRemove = {}
 	for k, v in SimCitizen.fighterList do
-		if v.nMapId and v.nMapId == idMap and v.camp == camp and v.tongkim == 1 then
+		if v.nMapId and v.nMapId == idMap and v.camp == camp and v.tongkim == 1 and v.finalIndex and v.finalIndex > 0 then
 			tinsert(toRemove, v.id)
 		end
 	end

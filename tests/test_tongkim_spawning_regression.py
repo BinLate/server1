@@ -4,7 +4,7 @@ Directly loads and executes the actual Lua source files:
 - script/global/nobitaxd/vdk/simcity/plugins/pchientranh.lua
 - script/battles/marshal/simtk.lua
 
-Tests all production Lua edge cases and mechanics requested by review:
+Tests all production Lua edge cases and mechanics:
 1. SimCityChienTranh:genWalkPath() edge cases:
    - presetPaths == nil
    - baseDuoi / baseTren == nil
@@ -18,10 +18,11 @@ Tests all production Lua edge cases and mechanics requested by review:
    - Successful graph build creates Tong and Kim bots with valid paths
 3. simTK:countBotsByCamp():
    - Counts only bots with finalIndex > 0, camp match, and tongkim == 1
-4. simTK:syncCampBots():
+4. simTK:syncCampBots() & simTK:trimCampBots():
    - Proves independent camp replenishment and capping at 5 Tong + 5 Kim
    - Replenishes depleted camp without affecting the other camp
-   - Trims excess bots if a camp exceeds 5
+   - Trims excess live bots without removing extra bots due to dead (finalIndex=0) entries
+   - Verifies 6 live bots + 2 dead bots trimmed down to exactly 5 live bots
 """
 
 import unittest
@@ -286,6 +287,28 @@ class TestTongKimLuaProduction(unittest.TestCase):
 
         self.assertEqual(final_tong, 5)
         self.assertEqual(final_kim, 5)
+
+    def test_lua_trim_camp_bots_ignores_dead_bots_and_leaves_exactly_five_live_bots(self):
+        self._create_mock_world(380)
+        # 6 live bots (finalIndex > 0) + 2 dead bots (finalIndex = 0)
+        self.lua.execute("""
+            SimCitizen.fighterList = make_iterable_table({
+                [1] = { id = 1, nMapId = 380, camp = 1, tongkim = 1, finalIndex = 1001 },
+                [2] = { id = 2, nMapId = 380, camp = 1, tongkim = 1, finalIndex = 1002 },
+                [3] = { id = 3, nMapId = 380, camp = 1, tongkim = 1, finalIndex = 1003 },
+                [4] = { id = 4, nMapId = 380, camp = 1, tongkim = 1, finalIndex = 1004 },
+                [5] = { id = 5, nMapId = 380, camp = 1, tongkim = 1, finalIndex = 1005 },
+                [6] = { id = 6, nMapId = 380, camp = 1, tongkim = 1, finalIndex = 1006 },
+                [7] = { id = 7, nMapId = 380, camp = 1, tongkim = 1, finalIndex = 0 },    -- dead bot 1
+                [8] = { id = 8, nMapId = 380, camp = 1, tongkim = 1, finalIndex = 0 },    -- dead bot 2
+            })
+            SimCitizen.counter = 9
+            simTK:syncCampBots(380, 5)
+        """)
+
+        # Should trim only 1 live bot (6 - 5 = 1), leaving exactly 5 live bots
+        final_tong = self.lua.eval("simTK:countBotsByCamp(380, 1)")
+        self.assertEqual(final_tong, 5)
 
 
 if __name__ == "__main__":
