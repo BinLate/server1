@@ -244,8 +244,8 @@ function simTK:call_npc_simcity(nIdMap,startNPCIndex, stopNPCIndex, nCount ,ngoa
 end
 function simTK:add_npc_simcity(idMap)
 	local curBots = (SimCityChienTranh and SimCityChienTranh.countMap and SimCityChienTranh:countMap(idMap)) or 0
-	if curBots >= 60 then return end
-	local toSpawn = 30
+	if curBots >= 10 then return end
+	local toSpawn = 5
 	self:call_npc_simcity(idMap, 2000, 2023, toSpawn, 1)
 	local _wi = SimCityWorld:Get(idMap)
 	if _wi then _wi.tkWarStarted = 0 end
@@ -253,9 +253,9 @@ end
 
 function simTK:ensureBots(idMap)
 	local curBots = (SimCityChienTranh and SimCityChienTranh.countMap and SimCityChienTranh:countMap(idMap)) or 0
-	if curBots >= 60 then return end
-	local needed = floor((60 - curBots) / 2)
-	if needed <= 0 then needed = 30 end
+	if curBots >= 10 then return end
+	local needed = floor((10 - curBots) / 2)
+	if needed <= 0 then needed = 5 end
 	self:call_npc_simcity(idMap, 2000, 2023, needed, 1)
 	local _wi = SimCityWorld:Get(idMap)
 	if _wi then _wi.tkWarStarted = 1 end
