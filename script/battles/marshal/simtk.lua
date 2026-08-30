@@ -242,21 +242,53 @@ function simTK:call_npc_simcity(nIdMap,startNPCIndex, stopNPCIndex, nCount ,ngoa
 	end
 
 end
+function simTK:countBotsByCamp(idMap, camp)
+	local counter = 0
+	if SimCitizen and SimCitizen.fighterList then
+		for k, v in SimCitizen.fighterList do
+			if v.nMapId and v.nMapId == idMap and v.camp == camp then
+				counter = counter + 1
+			end
+		end
+	end
+	return counter
+end
+
+function simTK:spawnCampBots(idMap, camp, count)
+	local nIdNpc = 2000
+	for i = 1, count do
+		self:add_npc_simcity_by_camp(idMap, nIdNpc, camp)
+		nIdNpc = nIdNpc + 1
+		if nIdNpc > 2023 then
+			nIdNpc = 2000
+		end
+	end
+end
+
 function simTK:add_npc_simcity(idMap)
-	local curBots = (SimCityChienTranh and SimCityChienTranh.countMap and SimCityChienTranh:countMap(idMap)) or 0
-	if curBots >= 10 then return end
-	local toSpawn = 5
-	self:call_npc_simcity(idMap, 2000, 2023, toSpawn, 1)
+	local count1 = self:countBotsByCamp(idMap, 1)
+	local count2 = self:countBotsByCamp(idMap, 2)
+	local maxPerCamp = 5
+	if count1 < maxPerCamp then
+		self:spawnCampBots(idMap, 1, maxPerCamp - count1)
+	end
+	if count2 < maxPerCamp then
+		self:spawnCampBots(idMap, 2, maxPerCamp - count2)
+	end
 	local _wi = SimCityWorld:Get(idMap)
 	if _wi then _wi.tkWarStarted = 0 end
 end
 
 function simTK:ensureBots(idMap)
-	local curBots = (SimCityChienTranh and SimCityChienTranh.countMap and SimCityChienTranh:countMap(idMap)) or 0
-	if curBots >= 10 then return end
-	local needed = floor((10 - curBots) / 2)
-	if needed <= 0 then needed = 5 end
-	self:call_npc_simcity(idMap, 2000, 2023, needed, 1)
+	local count1 = self:countBotsByCamp(idMap, 1)
+	local count2 = self:countBotsByCamp(idMap, 2)
+	local maxPerCamp = 5
+	if count1 < maxPerCamp then
+		self:spawnCampBots(idMap, 1, maxPerCamp - count1)
+	end
+	if count2 < maxPerCamp then
+		self:spawnCampBots(idMap, 2, maxPerCamp - count2)
+	end
 	local _wi = SimCityWorld:Get(idMap)
 	if _wi then _wi.tkWarStarted = 1 end
 end
