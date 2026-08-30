@@ -222,17 +222,27 @@ function simTK:add_npc_simcity_by_camp(nIdMap, nIdNpc, forCamp)
 	local worldInfo = SimCityWorld:Get(nIdMap)
 	if not worldInfo then return nil end
 
-	if not worldInfo.presetPaths or not worldInfo.presetPaths.baseDuoi or not worldInfo.presetPaths.baseTren then
-		if SimCityGraphToChienTranh and SimCityGraphToChienTranh.build then
-			local result = SimCityGraphToChienTranh:build(worldInfo, 32)
-			if result == 0
-				or not worldInfo.presetPaths
-				or not worldInfo.presetPaths.baseDuoi
-				or not worldInfo.presetPaths.baseTren
-				or getn(worldInfo.presetPaths.baseDuoi) == 0
-				or getn(worldInfo.presetPaths.baseTren) == 0 then
-				return nil
-			end
+	local pathsInvalid =
+		not worldInfo.presetPaths
+		or not worldInfo.presetPaths.baseDuoi
+		or not worldInfo.presetPaths.baseTren
+		or getn(worldInfo.presetPaths.baseDuoi) == 0
+		or getn(worldInfo.presetPaths.baseTren) == 0
+
+	if pathsInvalid then
+		if not SimCityGraphToChienTranh or not SimCityGraphToChienTranh.build then
+			return nil
+		end
+
+		local result = SimCityGraphToChienTranh:build(worldInfo, 32)
+
+		if result == 0
+			or not worldInfo.presetPaths
+			or not worldInfo.presetPaths.baseDuoi
+			or not worldInfo.presetPaths.baseTren
+			or getn(worldInfo.presetPaths.baseDuoi) == 0
+			or getn(worldInfo.presetPaths.baseTren) == 0 then
+			return nil
 		end
 	end
 

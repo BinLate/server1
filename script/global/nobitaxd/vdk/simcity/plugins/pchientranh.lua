@@ -47,26 +47,21 @@ end
 
 function SimCityChienTranh:genWalkPath(forCamp) 
 	local worldInfo = SimCityWorld:Get(self.nW)
-
-	
-	-- FIX: Luon luon camp1 (Tong) o duoi, camp2 (Kim) o tren
-	-- worldInfo.camp2TopRight = 1 (luon luon)
-	local myPath = {}
-	local mySpawnODuoi = 1
-	
-	-- Don gian: camp 1 = duoi, camp 2 = tren
-	if forCamp == 1 then
-		mySpawnODuoi = 1  -- Tong luon o duoi
-	else
-		mySpawnODuoi = 0  -- Kim luon o tren
+	if not worldInfo or not worldInfo.presetPaths then
+		return nil
 	end
 
 	local presetCampDuoiKey = worldInfo.presetPaths.baseDuoi
 	local presetCampTrenKey = worldInfo.presetPaths.baseTren 
+	if not presetCampDuoiKey or not presetCampTrenKey or getn(presetCampDuoiKey) == 0 or getn(presetCampTrenKey) == 0 then
+		return nil
+	end
+
+	local myPath = {}
+	local mySpawnODuoi = (forCamp == 1) and 1 or 0
 
 	if (mySpawnODuoi == 1) then
-		
-		if worldInfo.restrictedSpawns.campduoi then
+		if worldInfo.restrictedSpawns and worldInfo.restrictedSpawns.campduoi then
 			local filtered = {}
 			for i=1, getn(presetCampDuoiKey) do
 				local key = presetCampDuoiKey[i]
@@ -77,18 +72,20 @@ function SimCityChienTranh:genWalkPath(forCamp)
 			presetCampDuoiKey = filtered
 		end
 
+		if not presetCampDuoiKey or getn(presetCampDuoiKey) == 0 or not presetCampTrenKey or getn(presetCampTrenKey) == 0 then
+			return nil
+		end
+
 		local mySpawn = presetCampDuoiKey[random(1, getn(presetCampDuoiKey))]
 		local theirSpawn = presetCampTrenKey[random(1, getn(presetCampTrenKey))]
 		local mainPath = SimCityGraphToChienTranh:autoFindPathNames(worldInfo, mySpawn, theirSpawn, 0)
+		if not mainPath then return nil end
 
  		tinsert(myPath, { mySpawn, 0 })
 		tinsert(myPath, { mainPath, 1})
 		tinsert(myPath, { theirSpawn, 1 })
-
-	-- My spawn o tren
 	else
-
-		if worldInfo.restrictedSpawns.camptren then
+		if worldInfo.restrictedSpawns and worldInfo.restrictedSpawns.camptren then
 			local filtered = {}
 			for i=1, getn(presetCampTrenKey) do
 				local key = presetCampTrenKey[i]
@@ -99,9 +96,15 @@ function SimCityChienTranh:genWalkPath(forCamp)
 			presetCampTrenKey = filtered
 		end
 
+		if not presetCampDuoiKey or getn(presetCampDuoiKey) == 0 or not presetCampTrenKey or getn(presetCampTrenKey) == 0 then
+			return nil
+		end
+
 		local mySpawn = presetCampTrenKey[random(1, getn(presetCampTrenKey))]
 		local theirSpawn = presetCampDuoiKey[random(1, getn(presetCampDuoiKey))]
 		local mainPath = SimCityGraphToChienTranh:autoFindPathNames(worldInfo, mySpawn, theirSpawn, 1)
+		if not mainPath then return nil end
+
  		tinsert(myPath, { mySpawn, 0 })
 		tinsert(myPath, { mainPath, -1})
 		tinsert(myPath, { theirSpawn, 1 })
