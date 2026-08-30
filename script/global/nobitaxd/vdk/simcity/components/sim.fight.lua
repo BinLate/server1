@@ -128,8 +128,8 @@ function execCastNormalSkill(self, simInstance, tbNpc)
     local maxChaseTiles = SIMBOT_CHASE_MAX_TILES or 20
     local foundPlayerEnemy = tbNpc.isPlayerEnemyAround
     if foundPlayerEnemy and foundPlayerEnemy > 0 then
-        local targetTileX, targetTileY, targetW = CallPlayerFunction(foundPlayerEnemy, GetWorldPos)
-        if targetTileX and targetTileY and targetW == myW then
+        local targetW, targetTileX, targetTileY = CallPlayerFunction(foundPlayerEnemy, GetWorldPos)
+        if targetW and targetTileX and targetTileY and targetW == myW then
             local dist = GetDistanceRadius(myTileX, myTileY, targetTileX, targetTileY)
             if dist > maxChaseTiles then
                 tbNpc.isPlayerEnemyAround = 0

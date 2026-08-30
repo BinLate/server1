@@ -38,6 +38,8 @@ class TestPhaseASafety(unittest.TestCase):
         floor = math.floor
         abs = math.abs
         sqrt = math.sqrt
+        max = math.max
+        min = math.min
         getn = function(t) return (t and table.getn and table.getn(t)) or (t and #t) or 0 end
         tinsert = table.insert
         tremove = table.remove
@@ -417,6 +419,69 @@ class TestPhaseASafety(unittest.TestCase):
         self.assertEqual(c_rep, 15)
         self.assertEqual(c_before_hib, 15)
         self.assertEqual(c_after_hib, 0)
+
+    def test_exec_cast_normal_skill_player_target_combat(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local botId = SimCitizen:New({ nMapId = 380, nNpcId = 100, faction = "thieulam" })
+        local bot = SimCitizen:Get(botId)
+        bot.finalIndex = 1001
+        bot.nMapId = 380
+        bot.tick_canCast = 0
+        bot.tick_breath = 100
+        bot.skillId = 318
+        bot.skillLevel = 20
+
+        -- Mock NPC position on map 380 at tile (100, 100) -> 3200, 3200
+        GetNpcPos = function(idx) return 3200, 3200, 380 end
+
+        local castSkillCalled = 0
+        local runCalled = 0
+        NpcCastSkill = function(idx, sk, lv, x32, y32)
+            castSkillCalled = castSkillCalled + 1
+        end
+        NpcRun = function(idx, tx, ty)
+            runCalled = runCalled + 1
+        end
+
+        -- Case 1: Enemy player on same map 380 within cast range (tile 101, 101)
+        bot.isPlayerEnemyAround = 1
+        CallPlayerFunction = function(pIdx, fn) return 380, 101, 101 end
+        bot.fightSys:Update(SimCitizen, bot)
+        local c1_cast = castSkillCalled
+        local c1_active = bot.isPlayerEnemyAround
+
+        -- Case 2: Enemy player on same map 380 outside cast range but within chase range (tile 110, 110)
+        bot.isPlayerEnemyAround = 1
+        bot.tick_canCast = 0
+        CallPlayerFunction = function(pIdx, fn) return 380, 110, 110 end
+        bot.fightSys:Update(SimCitizen, bot)
+        local c2_run = runCalled
+        local c2_active = bot.isPlayerEnemyAround
+
+        -- Case 3: Enemy player on different map 999 -> target should be cleared
+        bot.isPlayerEnemyAround = 1
+        bot.tick_canCast = 0
+        CallPlayerFunction = function(pIdx, fn) return 999, 101, 101 end
+        bot.fightSys:Update(SimCitizen, bot)
+        local c3_active = bot.isPlayerEnemyAround
+
+        -- Case 4: Enemy player too far (distance > 20 tiles) -> chase cap clears target
+        bot.isPlayerEnemyAround = 1
+        bot.tick_canCast = 0
+        CallPlayerFunction = function(pIdx, fn) return 380, 200, 200 end
+        bot.fightSys:Update(SimCitizen, bot)
+        local c4_active = bot.isPlayerEnemyAround
+
+        return c1_cast > 0, c1_active == 1, c2_run > 0, c2_active == 1, c3_active == 0, c4_active == 0
+        """)
+        c1_cast, c1_act, c2_run, c2_act, c3_cleared, c4_cleared = res
+        self.assertTrue(c1_cast)
+        self.assertTrue(c1_act)
+        self.assertTrue(c2_run)
+        self.assertTrue(c2_act)
+        self.assertTrue(c3_cleared)
+        self.assertTrue(c4_cleared)
 
     def test_sim_citizen_transactional_rollback(self):
         self.init_simcity_environment()
