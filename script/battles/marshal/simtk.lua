@@ -265,30 +265,43 @@ function simTK:spawnCampBots(idMap, camp, count)
 	end
 end
 
+function simTK:trimCampBots(idMap, camp, maxAllowed)
+	if not SimCitizen or not SimCitizen.fighterList then return end
+	local toRemove = {}
+	for k, v in SimCitizen.fighterList do
+		if v.nMapId and v.nMapId == idMap and v.camp == camp then
+			tinsert(toRemove, v.id)
+		end
+	end
+	local count = getn(toRemove)
+	if count > maxAllowed then
+		local excess = count - maxAllowed
+		for i = 1, excess do
+			SimCitizen:Remove(toRemove[i])
+		end
+	end
+end
+
+function simTK:syncCampBots(idMap, maxPerCamp)
+	maxPerCamp = maxPerCamp or 5
+	for camp = 1, 2 do
+		local count = self:countBotsByCamp(idMap, camp)
+		if count < maxPerCamp then
+		self:spawnCampBots(idMap, camp, maxPerCamp - count)
+		elseif count > maxPerCamp then
+			self:trimCampBots(idMap, camp, maxPerCamp)
+		end
+	end
+end
+
 function simTK:add_npc_simcity(idMap)
-	local count1 = self:countBotsByCamp(idMap, 1)
-	local count2 = self:countBotsByCamp(idMap, 2)
-	local maxPerCamp = 5
-	if count1 < maxPerCamp then
-		self:spawnCampBots(idMap, 1, maxPerCamp - count1)
-	end
-	if count2 < maxPerCamp then
-		self:spawnCampBots(idMap, 2, maxPerCamp - count2)
-	end
+	self:syncCampBots(idMap, 5)
 	local _wi = SimCityWorld:Get(idMap)
 	if _wi then _wi.tkWarStarted = 0 end
 end
 
 function simTK:ensureBots(idMap)
-	local count1 = self:countBotsByCamp(idMap, 1)
-	local count2 = self:countBotsByCamp(idMap, 2)
-	local maxPerCamp = 5
-	if count1 < maxPerCamp then
-		self:spawnCampBots(idMap, 1, maxPerCamp - count1)
-	end
-	if count2 < maxPerCamp then
-		self:spawnCampBots(idMap, 2, maxPerCamp - count2)
-	end
+	self:syncCampBots(idMap, 5)
 	local _wi = SimCityWorld:Get(idMap)
 	if _wi then _wi.tkWarStarted = 1 end
 end
