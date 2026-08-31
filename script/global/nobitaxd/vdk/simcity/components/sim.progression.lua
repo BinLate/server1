@@ -629,9 +629,18 @@ local function _sim_read(f, mode)
     return nil
 end
 local function _sim_write(f, str)
-    if not f or not str then return end
-    if write then return write(f, str) end
-    if f.write then return f:write(str) end
+    if not f or not str then return 0 end
+    if write then
+        local ok, res = pcall(write, f, str)
+        if not ok or res == nil or res == false or res == 0 then return 0 end
+        return 1
+    end
+    if f.write then
+        local ok, res = pcall(function() return f:write(str) end)
+        if not ok or res == nil or res == false or res == 0 then return 0 end
+        return 1
+    end
+    return 0
 end
 -- Helper function for atomic file rename
 -- On Linux / POSIX game server (GLIBC), rename(2) is guaranteed atomic and replaces existing destination files
@@ -660,7 +669,13 @@ function SimProgression:SaveTrainBots(mapId, botList)
 
     local count = (botList and getn(botList)) or 0
     local curTime = (GetGameTime and GetGameTime()) or 0
-    _sim_write(f, format("SIMROSTER_V1|%d|%d|%d\n", mapId, curTime, count))
+    local hwOk = _sim_write(f, format("SIMROSTER_V1|%d|%d|%d\n", mapId, curTime, count))
+    if hwOk ~= 1 then
+        _sim_close(f)
+        if removefile then pcall(removefile, szTmpPath) end
+        if os and os.remove then pcall(os.remove, szTmpPath) end
+        return 0
+    end
 
     if botList then
         for i = 1, count do
@@ -678,7 +693,13 @@ function SimProgression:SaveTrainBots(mapId, botList)
                     b.camp or 0,
                     b.personality or "balanced"
                 )
-                _sim_write(f, line)
+                local lwOk = _sim_write(f, line)
+                if lwOk ~= 1 then
+                    _sim_close(f)
+                    if removefile then pcall(removefile, szTmpPath) end
+                    if os and os.remove then pcall(os.remove, szTmpPath) end
+                    return 0
+                end
             end
         end
     end

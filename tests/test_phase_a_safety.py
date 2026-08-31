@@ -125,7 +125,8 @@ class TestPhaseASafety(unittest.TestCase):
             return nil
         end
         write = function(f, str)
-            if f then f:write(str) end
+            if f and f.write then return f:write(str) end
+            return 1
         end
         renamefile = function(oldp, newp)
             if os_replace then

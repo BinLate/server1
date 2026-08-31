@@ -129,7 +129,8 @@ class TestPhaseBProgression(unittest.TestCase):
             return nil
         end
         write = function(f, str)
-            if f then f:write(str) end
+            if f and f.write then return f:write(str) end
+            return 1
         end
         renamefile = function(oldp, newp)
             if os_replace then
@@ -624,6 +625,58 @@ class TestPhaseBProgression(unittest.TestCase):
         self.assertEqual(cntB, 1)
         self.assertEqual(nmB, "HeroBeta")
         self.assertEqual(lvB, 150)
+        self.assertFalse(tmpExists)
+
+    def test_crash_safe_roster_write_failure_preserves_old_data(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local mapId = 53
+
+        -- 1. Initial valid save of Roster A
+        local rosterA = {
+            { szName = "OldHeroA", level = 100, nExp = 5000, faction = "thieulam", series = 1, weaponBranch = "dao", nNpcId = 101, camp = 0, personality = "balanced" }
+        }
+        local saveOkA = SimProgression:SaveTrainBots(mapId, rosterA)
+
+        -- 2. Mock write failure during subsequent write attempts
+        local old_write = write
+        local write_calls = 0
+        write = function(f, str)
+            write_calls = write_calls + 1
+            if write_calls > 1 then
+                return nil, "Disk full error"
+            end
+            if f and f.write then return f:write(str) end
+        end
+
+        -- 3. Attempt to save Roster B (which will fail on second line write)
+        local rosterB = {
+            { szName = "FailedHeroB", level = 150, nExp = 25000, faction = "vodang", series = 3, weaponBranch = "kiem", nNpcId = 105, camp = 5, personality = "aggressive" }
+        }
+        local saveRetB = SimProgression:SaveTrainBots(mapId, rosterB)
+
+        -- Restore original write
+        write = old_write
+
+        -- 4. Load roster from disk -> must remain intact as Roster A
+        local loaded = SimProgression:LoadTrainBots(mapId)
+        local count = getn(loaded)
+        local heroName = count > 0 and loaded[1].szName or ""
+        local heroLv = count > 0 and loaded[1].level or 0
+
+        -- 5. Verify no .tmp file remains
+        local tmpFile = io.open("save/simcity/train_map_53.dat.tmp", "r")
+        local tmpExists = tmpFile ~= nil
+        if tmpFile then tmpFile:close() end
+
+        return saveOkA == 1, saveRetB, count, heroName, heroLv, tmpExists
+        """)
+        okA, retB, cnt, hName, hLv, tmpExists = res
+        self.assertTrue(okA)
+        self.assertEqual(retB, 0)
+        self.assertEqual(cnt, 1)
+        self.assertEqual(hName, "OldHeroA")
+        self.assertEqual(hLv, 100)
         self.assertFalse(tmpExists)
 
 if __name__ == '__main__':
