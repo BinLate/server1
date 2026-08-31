@@ -96,9 +96,18 @@ end
 
 function SimMovement:CheckStuck(tbNpc, curTileX, curTileY)
     if not tbNpc or not curTileX or not curTileY then return 0 end
-    if tbNpc.isFighting == 1 then return 0 end
+    
     local st = tbNpc.moveState or SIM_MOVE_STATE.IDLE
     if st == SIM_MOVE_STATE.IDLE or st == SIM_MOVE_STATE.INACTIVE then
+        tbNpc.stuckTicks = 0
+        tbNpc.lastMoveTileX = curTileX
+        tbNpc.lastMoveTileY = curTileY
+        return 0
+    end
+
+    -- If fighting and intentionally stationary/casting, don't falsely accumulate stuck ticks
+    local cst = tbNpc.combatState
+    if tbNpc.isFighting == 1 and (cst == "COMBO" or cst == "COOLDOWN") and st ~= SIM_MOVE_STATE.CHASE and st ~= SIM_MOVE_STATE.KITE then
         tbNpc.stuckTicks = 0
         tbNpc.lastMoveTileX = curTileX
         tbNpc.lastMoveTileY = curTileY

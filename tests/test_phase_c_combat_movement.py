@@ -391,5 +391,112 @@ class TestPhaseCCombatMovement(unittest.TestCase):
         self.assertEqual(combatState, "RETREAT_HEAL")
         self.assertTrue(healed)
 
+    def test_combat_stuck_recovery_while_chasing(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local dashCalled = 0
+        BotDashTo = function(idx, x, y, speed) dashCalled = dashCalled + 1 end
+
+        local tbNpc = {
+            id = 1,
+            finalIndex = 1001,
+            moveState = SIM_MOVE_STATE.CHASE,
+            isFighting = 1,
+            stuckTicks = 0,
+            stuckRecoveries = 0
+        }
+
+        -- Baseline
+        local s0 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        -- 5 consecutive stationary ticks while chasing in combat
+        local s1 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s2 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s3 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s4 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s5 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local ticksBefore = tbNpc.stuckTicks
+
+        local recovered = 0
+        if s5 == 1 then
+            recovered = SimMovement:HandleStuck(nil, tbNpc, 100, 100)
+        end
+        local ticksAfter = tbNpc.stuckTicks
+        local countAfter = tbNpc.stuckRecoveries
+
+        return s5 == 1, ticksBefore, recovered == 1, dashCalled, ticksAfter, countAfter
+        """)
+        s5_stuck, tBefore, rec_ok, dashes, tAfter, cntAfter = res
+        self.assertTrue(s5_stuck)
+        self.assertEqual(tBefore, 5)
+        self.assertTrue(rec_ok)
+        self.assertGreater(dashes, 0)
+        self.assertEqual(tAfter, 0)
+        self.assertEqual(cntAfter, 1)
+
+    def test_combat_stuck_recovery_while_kiting(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local dashCalled = 0
+        BotDashTo = function(idx, x, y, speed) dashCalled = dashCalled + 1 end
+
+        local tbNpc = {
+            id = 1,
+            finalIndex = 1001,
+            moveState = SIM_MOVE_STATE.KITE,
+            isFighting = 1,
+            stuckTicks = 0,
+            stuckRecoveries = 0
+        }
+
+        local s0 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s1 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s2 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s3 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s4 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s5 = SimMovement:CheckStuck(tbNpc, 100, 100)
+
+        local recovered = 0
+        if s5 == 1 then
+            recovered = SimMovement:HandleStuck(nil, tbNpc, 100, 100)
+        end
+
+        return s5 == 1, recovered == 1, tbNpc.stuckTicks, tbNpc.stuckRecoveries
+        """)
+        s5_stuck, rec_ok, tAfter, cntAfter = res
+        self.assertTrue(s5_stuck)
+        self.assertTrue(rec_ok)
+        self.assertEqual(tAfter, 0)
+        self.assertEqual(cntAfter, 1)
+
+    def test_combat_no_false_stuck_while_casting_in_place(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local tbNpc = {
+            id = 1,
+            finalIndex = 1001,
+            moveState = SIM_MOVE_STATE.IDLE,
+            combatState = "COMBO",
+            isFighting = 1,
+            stuckTicks = 0
+        }
+
+        local s0 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s1 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s2 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s3 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s4 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s5 = SimMovement:CheckStuck(tbNpc, 100, 100)
+
+        return s0, s1, s2, s3, s4, s5, tbNpc.stuckTicks
+        """)
+        s0, s1, s2, s3, s4, s5, tTicks = res
+        self.assertEqual(s0, 0)
+        self.assertEqual(s1, 0)
+        self.assertEqual(s2, 0)
+        self.assertEqual(s3, 0)
+        self.assertEqual(s4, 0)
+        self.assertEqual(s5, 0)
+        self.assertEqual(tTicks, 0)
+
 if __name__ == '__main__':
     unittest.main()
