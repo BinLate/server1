@@ -7,6 +7,7 @@ from lupa import LuaRuntime
 class TestPhaseASafety(unittest.TestCase):
     def setUp(self):
         self.lua = LuaRuntime(unpack_returned_tuples=True)
+        self.lua.globals().os_replace = os.replace
         mock_env = """
         local function make_iter(t)
             return setmetatable(t or {}, {
@@ -83,7 +84,7 @@ class TestPhaseASafety(unittest.TestCase):
         SetNpcKind = function(idx, k) end
         SetNpcCurCamp = function(idx, camp) end
         SetNpcParam = function(idx, p, v) end
-        GetNpcName = function(idx) return "Bot" end
+        GetNpcName = function(idx) return _G_NPC_NAMES[idx] or "Bot" end
         SetNpcName = function(idx, n) end
         SetNpcScript = function(idx, s) end
         SetNpcFightState = function(idx, st) end
@@ -104,12 +105,39 @@ class TestPhaseASafety(unittest.TestCase):
         isCuoiTuan = function() return 0 end
         nodeNameToCoords = function(name) return 100, 100 end
         SubWorldID2Idx = function(id) return id end
-        AddNpc = function(id, lv, mapIdx, x, y, a, name, b) return 1001 end
-        AddNpcEx = function(...) return 1001 end
+        _G_NPC_NAMES = {}
+        AddNpc = function(id, lv, mapIdx, x, y, a, name, b) _G_NPC_NAMES[1001] = name; return 1001 end
+        AddNpcEx = function(id, lv, series, mapIdx, x, y, a, name, b) _G_NPC_NAMES[1001] = name; return 1001 end
         GetDistanceRadius = function(x1, y1, x2, y2)
             local dx = (x1 or 0) - (x2 or 0)
             local dy = (y1 or 0) - (y2 or 0)
             return math.sqrt(dx * dx + dy * dy)
+        end
+
+        openfile = function(path, mode)
+            return io.open(path, mode)
+        end
+        closefile = function(f)
+            if f then f:close() end
+        end
+        flushfile = function(f)
+            if f and f.flush then f:flush() end
+        end
+        read = function(f, mode)
+            if f then return f:read(mode) end
+            return nil
+        end
+        write = function(f, str)
+            if f and f.write then return f:write(str) end
+            return 1
+        end
+        renamefile = function(oldp, newp)
+            if os_replace then
+                os_replace(oldp, newp)
+                return
+            end
+            local ok, err = os.rename(oldp, newp)
+            if not ok then return nil, err end
         end
         """
         self.lua.execute(mock_env)

@@ -136,12 +136,25 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
         pool = { 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110 }
     end
 
+    -- 1. Try to load saved persistent roster for this map
+    local savedRoster = (SimProgression and SimProgression.LoadTrainBots and SimProgression:LoadTrainBots(m.mapId)) or {}
+    local savedIdx = 1
+
     for i = 1, needed do
-        local id = pool[random(1, getn(pool))]
-        local lv = random(m.minLv, m.maxLv)
+        local savedBot = savedRoster[savedIdx]
+        savedIdx = savedIdx + 1
+
+        local id = (savedBot and savedBot.nNpcId) or pool[random(1, getn(pool))]
+        local lv = (savedBot and savedBot.level) or random(m.minLv, m.maxLv)
+        local nExp = (savedBot and savedBot.nExp) or 0
+        local szName = (savedBot and savedBot.szName) or nil
+        local faction = (savedBot and savedBot.faction) or nil
+        local series = (savedBot and savedBot.series) or nil
+        local weaponBranch = (savedBot and savedBot.weaponBranch) or nil
+        local personality = (savedBot and savedBot.personality) or "balanced"
 
         -- 5-10% ty le bot bat Do Sat (Camp 5)
-        local isDoSat = (random(1, 100) <= 8)
+        local isDoSat = (savedBot and savedBot.camp == 5) or (random(1, 100) <= 8)
         local camp = (isDoSat and 5) or 0
 
         local tbNpc = {
@@ -149,6 +162,12 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
             nMapId = m.mapId,
             mode = "train",
             level = lv,
+            nExp = nExp,
+            szName = szName,
+            faction = faction,
+            series = series,
+            weaponBranch = weaponBranch,
+            personality = personality,
             camp = camp,
             isFighting = 1,
             walkMode = "random",
@@ -184,7 +203,61 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
     self.mapState[m.mapId].lastPlayerSeen = (GetGameTime and GetGameTime()) or 0
 end
 
+function SimCityLuyenCong:findMapIndex(mapId)
+    for i = 1, getn(self.TRAIN_MAPS) do
+        if self.TRAIN_MAPS[i].mapId == mapId then
+            return i
+        end
+    end
+    return nil
+end
+
 function SimCityLuyenCong:hibernateMap(mapId)
+    -- Snapshot persistent bots before clearing
+    local rosterToSave = {}
+    local migratedBots = {}
+
+    local mapIdx = self:findMapIndex(mapId)
+    local curMapConfig = mapIdx and self.TRAIN_MAPS[mapIdx]
+
+    if SimCitizen and SimCitizen.fighterList then
+        for id, bot in pairs(SimCitizen.fighterList) do
+            if bot.mode == "train" and bot.nMapId == mapId then
+                local botData = {
+                    szName = bot.szName or "DocCoCauBai",
+                    level = bot.level or 1,
+                    nExp = bot.nExp or 0,
+                    faction = bot.faction or "thieulam",
+                    series = bot.series or 0,
+                    weaponBranch = bot.weaponBranch or "taykhong",
+                    nNpcId = bot.nNpcId or 100,
+                    camp = bot.camp or 0,
+                    personality = bot.personality or "balanced"
+                }
+                -- Check for pending migration to next map tier if bot outleveled current map
+                if curMapConfig and botData.level > curMapConfig.maxLv and mapIdx < getn(self.TRAIN_MAPS) then
+                    local nextMapId = self.TRAIN_MAPS[mapIdx + 1].mapId
+                    if not migratedBots[nextMapId] then migratedBots[nextMapId] = {} end
+                    tinsert(migratedBots[nextMapId], botData)
+                else
+                    tinsert(rosterToSave, botData)
+                end
+            end
+        end
+    end
+
+    if SimProgression and SimProgression.SaveTrainBots then
+        SimProgression:SaveTrainBots(mapId, rosterToSave)
+        -- Save migrated bots into target higher tier map rosters
+        for targetMapId, mList in pairs(migratedBots) do
+            local targetRoster = SimProgression:LoadTrainBots(targetMapId) or {}
+            for k = 1, getn(mList) do
+                tinsert(targetRoster, mList[k])
+            end
+            SimProgression:SaveTrainBots(targetMapId, targetRoster)
+        end
+    end
+
     if SimCitizen and SimCitizen.ClearMap then
         SimCitizen:ClearMap(mapId, "train")
     end

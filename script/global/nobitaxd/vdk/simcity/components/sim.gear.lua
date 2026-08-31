@@ -232,11 +232,24 @@ function SimGear:GetCastCooldownTicks(tbNpc)
     end
 end
 
-function SimGear:ApplyCombatLeech(tbNpc)
+-- 10. COMBAT LIFE LEECH (PROBABILISTIC CAST-TRIGGERED LEECH)
+-- Note on JX1 Engine Architecture:
+-- In JX1 C-Engine, NpcCastSkill and BotDoSkill are asynchronous calls where projectile path,
+-- hit registration and damage calculations are resolved asynchronously in core game ticks.
+-- Therefore, combat life leech is implemented as probabilistic cast-triggered life leech (70% effective hit rate)
+-- gated strictly by active enemy target presence (player or NPC) and tier-based life leech gear stats.
+function SimGear:ApplyCombatLeech(tbNpc, targetIdx, targetType)
     if not tbNpc or not tbNpc.finalIndex or tbNpc.finalIndex <= 0 then return end
     if not tbNpc.virtualGear then return end
     local tier = tbNpc.virtualGear.tier or 1
     if tier < 5 then return end -- Chi do cap 5x tro len moi co dong Hut Sinh Luc
+
+    -- Validate target index and target type (must be "player" or "npc")
+    if not targetIdx or targetIdx <= 0 then return end
+    if targetType ~= "player" and targetType ~= "npc" then return end
+
+    -- Probabilistic hit roll (70% hit rate) per cast cycle
+    if random(1, 100) > 70 then return end
 
     local leechRate = tier * 0.006 -- 3% toi 7.2%
     local curHp = (NPCINFO_GetNpcCurrentLife and NPCINFO_GetNpcCurrentLife(tbNpc.finalIndex)) or tbNpc.lastHP or 0

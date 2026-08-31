@@ -34,7 +34,7 @@ function SimProgression:GetExpRequired(level)
     if self.EXP_TABLE[level] then
         return self.EXP_TABLE[level]
     end
-    return floor(210000000 + (level - 100) * 30000000)
+    return floor(210000000 + (level - 100) * 35000000)
 end
 
 -- 2. TINH TOAN SINH LUC (MAX HP) CHUAN CLASSIC VLTK1 (LINEAR GROWTH + GEAR)
@@ -551,9 +551,10 @@ function SimProgression:AddExp(tbNpc, nExp)
     tbNpc.nExp = (tbNpc.nExp or 0) + nExp
 
     local leveledUp = 0
+    local maxLevel = SIMBOT_MAX_LEVEL or 200
     local reqExp = self:GetExpRequired(tbNpc.level)
 
-    while tbNpc.nExp >= reqExp and tbNpc.level < 150 do
+    while tbNpc.nExp >= reqExp and tbNpc.level < maxLevel do
         tbNpc.nExp = tbNpc.nExp - reqExp
         tbNpc.level = tbNpc.level + 1
         leveledUp = leveledUp + 1
@@ -591,6 +592,219 @@ function SimProgression:OnLevelUp(tbNpc)
             CallPlayerFunction(pIdx, Msg2Player, format("<color=yellow>[Simbot]<color> <color=green>%s<color> da thang len cap <color=red>%d<color>!", botName, newLv))
         end
     end
+end
+
+
+-- 10.5. SANITIZATION & PATH SECURITY
+function SimProgression:SanitizeName(szName)
+    if not szName or type(szName) ~= "string" or szName == "" then
+        return "DocCoCauBai"
+    end
+    local clean = gsub(szName, "%c", "")
+    clean = gsub(clean, "|", "")
+    clean = gsub(clean, "/", "")
+    clean = gsub(clean, "\\", "")
+    clean = gsub(clean, "%.%.", "")
+    if clean == "" then
+        return "DocCoCauBai"
+    end
+    return clean
+end
+
+-- 10.6. PERSISTENCE: LUU VA DOC ROSTER SIMBOT LUYEN CONG (ATOMIC SAVE)
+local function _sim_open(path, mode)
+    if openfile then return openfile(path, mode) end
+    if io and io.open then return io.open(path, mode) end
+    return nil
+end
+local function _sim_flush(f)
+    if not f then return 0 end
+    if flushfile then
+        local ok, res, err = pcall(flushfile, f)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
+        return 1
+    end
+    if f.flush then
+        local ok, res, err = pcall(function() return f:flush() end)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
+        return 1
+    end
+    return 1
+end
+local function _sim_close(f)
+    if not f then return 0 end
+    if closefile then
+        local ok, res, err = pcall(closefile, f)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
+        return 1
+    end
+    if f.close then
+        local ok, res, err = pcall(function() return f:close() end)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
+        return 1
+    end
+    return 0
+end
+local function _sim_read(f, mode)
+    if not f then return nil end
+    if read then return read(f, mode) end
+    if f.read then return f:read(mode) end
+    return nil
+end
+local function _sim_write(f, str)
+    if not f or not str then return 0 end
+    if write then
+        local ok, res, err = pcall(write, f, str)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
+        return 1
+    end
+    if f.write then
+        local ok, res, err = pcall(function() return f:write(str) end)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
+        return 1
+    end
+    return 0
+end
+-- Helper function for atomic file rename
+-- On Linux / POSIX game server (GLIBC), rename(2) is guaranteed atomic and replaces existing destination files
+-- on the same filesystem without requiring pre-deletion. renamefile in JX1 C-engine maps directly to this syscall.
+local function _sim_rename(oldp, newp)
+    if renamefile then
+        local ok, res, err = pcall(renamefile, oldp, newp)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
+        return 1
+    end
+    if os and os.rename then
+        local ok, res, err = pcall(os.rename, oldp, newp)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
+        return 1
+    end
+    return 0
+end
+
+function SimProgression:SaveTrainBots(mapId, botList)
+    if not mapId or mapId <= 0 then return 0 end
+    local szDir = "save/simcity"
+    local szPath = format("%s/train_map_%d.dat", szDir, mapId)
+    local szTmpPath = format("%s/train_map_%d.dat.tmp", szDir, mapId)
+
+    local f = _sim_open(szTmpPath, "w")
+    if not f then return 0 end
+
+    local count = (botList and getn(botList)) or 0
+    local curTime = (GetGameTime and GetGameTime()) or 0
+    local hwOk = _sim_write(f, format("SIMROSTER_V1|%d|%d|%d\n", mapId, curTime, count))
+    if hwOk ~= 1 then
+        _sim_close(f)
+        if removefile then pcall(removefile, szTmpPath) end
+        if os and os.remove then pcall(os.remove, szTmpPath) end
+        return 0
+    end
+
+    if botList then
+        for i = 1, count do
+            local b = botList[i]
+            if b then
+                local sName = self:SanitizeName(b.szName or "DocCoCauBai")
+                local line = format("%s|%d|%d|%s|%d|%s|%d|%d|%s\n",
+                    sName,
+                    b.level or 1,
+                    b.nExp or 0,
+                    b.faction or "thieulam",
+                    b.series or 0,
+                    b.weaponBranch or "taykhong",
+                    b.nNpcId or 100,
+                    b.camp or 0,
+                    b.personality or "balanced"
+                )
+                local lwOk = _sim_write(f, line)
+                if lwOk ~= 1 then
+                    _sim_close(f)
+                    if removefile then pcall(removefile, szTmpPath) end
+                    if os and os.remove then pcall(os.remove, szTmpPath) end
+                    return 0
+                end
+            end
+        end
+    end
+
+    local flOk = _sim_flush(f)
+    if flOk ~= 1 then
+        _sim_close(f)
+        if removefile then pcall(removefile, szTmpPath) end
+        if os and os.remove then pcall(os.remove, szTmpPath) end
+        return 0
+    end
+
+    local clOk = _sim_close(f)
+    if clOk ~= 1 then
+        if removefile then pcall(removefile, szTmpPath) end
+        if os and os.remove then pcall(os.remove, szTmpPath) end
+        return 0
+    end
+
+    local renOk = _sim_rename(szTmpPath, szPath)
+    if renOk ~= 1 then
+        if removefile then pcall(removefile, szTmpPath) end
+        if os and os.remove then pcall(os.remove, szTmpPath) end
+        return 0
+    end
+    return 1
+end
+
+function SimProgression:LoadTrainBots(mapId)
+    if not mapId or mapId <= 0 then return {} end
+    local szPath = format("save/simcity/train_map_%d.dat", mapId)
+    local f = _sim_open(szPath, "r")
+    if not f then return {} end
+
+    local header = _sim_read(f, "*l")
+    if not header or not strfind(header, "SIMROSTER_V1") then
+        _sim_close(f)
+        return {}
+    end
+
+    local roster = {}
+    local line = _sim_read(f, "*l")
+    while line do
+        if line ~= "" and strsub(line, 1, 1) ~= "#" then
+            line = gsub(line, "%c", "")
+            local tokens = split(line, "|")
+            if tokens and getn(tokens) >= 7 then
+                local botData = {
+                    szName = self:SanitizeName(tokens[1]),
+                    level = tonumber(tokens[2]) or 1,
+                    nExp = tonumber(tokens[3]) or 0,
+                    faction = tokens[4] or "thieulam",
+                    series = tonumber(tokens[5]) or 0,
+                    weaponBranch = tokens[6] or "taykhong",
+                    nNpcId = tonumber(tokens[7]) or 100,
+                    camp = (tokens[8] and tonumber(tokens[8])) or 0,
+                    personality = tokens[9] or "balanced"
+                }
+                tinsert(roster, botData)
+            end
+        end
+        line = _sim_read(f, "*l")
+    end
+    _sim_close(f)
+    return roster
 end
 
 -- 11. PERSISTENCE: LUU VA DOC DAN XE (KEO XE)
@@ -676,87 +890,7 @@ function SimProgression:LoadKeoXe(szPlayerName)
     return tbList
 end
 
--- 12. PERSISTENCE: LUU VA DOC BOT LUYEN CONG THEO MAP
-function SimProgression:SaveTrainBots(nMapId, tbBotList)
-    if not nMapId then return 0 end
-    local szPath = format("dulieu/simcity/train_map_%d.txt", nMapId)
-    local f = openfile(szPath, "w")
-    if not f then return 0 end
 
-    write(f, "# SIMCITY MAP TRAIN BOT PERSISTENCE\n")
-    write(f, format("# MAP ID: %d\n", nMapId))
-    write(f, "# Index|Name|Level|Exp|Faction|Series|WeaponBranch|WeaponType|Camp|NpcId\n")
-
-    local count = 0
-    if tbBotList then
-        for i = 1, getn(tbBotList) do
-            local b = tbBotList[i]
-            if b and b.szName then
-                count = count + 1
-                local line = format("%d|%s|%d|%d|%s|%d|%s|%d|%d|%d\n",
-                    count,
-                    b.szName or "DocCoCauBai",
-                    b.level or 1,
-                    b.nExp or 0,
-                    b.faction or "thieulam",
-                    b.series or 0,
-                    b.weaponBranch or "taykhong",
-                    b.nNewWeaponType or 0,
-                    b.camp or 1,
-                    b.nNpcId or 1908
-                )
-                write(f, line)
-            end
-        end
-    end
-
-    closefile(f)
-    return count
-end
-
-function SimProgression:LoadTrainBots(nMapId)
-    if not nMapId then return {} end
-    local szPath = format("dulieu/simcity/train_map_%d.txt", nMapId)
-    local f = openfile(szPath, "r")
-    if not f then return {} end
-
-    local tbList = {}
-    local line = read(f, "*l")
-    while line do
-        if line ~= "" and strsub(line, 1, 1) ~= "#" then
-            local parts = {}
-            local s = line
-            while 1 do
-                local p = strfind(s, "|")
-                if p then
-                    tinsert(parts, strsub(s, 1, p - 1))
-                    s = strsub(s, p + 1)
-                else
-                    tinsert(parts, s)
-                    break
-                end
-            end
-
-            if getn(parts) >= 10 then
-                tinsert(tbList, {
-                    szName = parts[2],
-                    level = tonumber(parts[3]) or 1,
-                    nExp = tonumber(parts[4]) or 0,
-                    faction = parts[5],
-                    series = tonumber(parts[6]) or 0,
-                    weaponBranch = parts[7],
-                    nNewWeaponType = tonumber(parts[8]) or 0,
-                    camp = tonumber(parts[9]) or 1,
-                    nNpcId = tonumber(parts[10]) or 1908
-                })
-            end
-        end
-        line = read(f, "*l")
-    end
-
-    closefile(f)
-    return tbList
-end
 
 
 --========================================================
