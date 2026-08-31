@@ -29,6 +29,14 @@ class TestPhaseDSocialParty(unittest.TestCase):
             if not b then return a end
             return a
         end
+        objCopy = function(orig)
+            if type(orig) == 'table' then
+                local copy = {}
+                for k, v in pairs(orig) do copy[k] = v end
+                return copy
+            end
+            return orig
+        end
         randomRange = function(pos, variance)
             return { pos[1] + (variance or 0), pos[2] + (variance or 0) }
         end
@@ -413,6 +421,194 @@ class TestPhaseDSocialParty(unittest.TestCase):
         self.assertTrue(x_ok)
         self.assertTrue(y_ok)
         self.assertTrue(heal_tick_ok)
+
+    def test_sim_core_remove_cleans_up_party_membership(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local simCore = objCopy(SimCore)
+        simCore.fighterList = {}
+        simCore.removedIds = {}
+        simCore.totalFighters = 3
+
+        local leader = { id = 1, finalIndex = 1001, nMapId = 53 }
+        local mem1 = { id = 2, finalIndex = 1002, nMapId = 53 }
+        local mem2 = { id = 3, finalIndex = 1003, nMapId = 53 }
+
+        simCore.fighterList[1] = leader
+        simCore.fighterList[2] = mem1
+        simCore.fighterList[3] = mem2
+
+        local p = SimParty:CreateParty(leader)
+        SimParty:JoinParty(p.id, mem1)
+        SimParty:JoinParty(p.id, mem2)
+
+        local initialCount = getn(p.members)
+
+        -- 1. Remove ordinary member 2 -> member removed, party still has 2 members
+        simCore:Remove(2)
+        local countAfterMem1 = getn(p.members)
+        local mem1PartyId = mem1.virtualPartyId
+
+        -- 2. Remove leader 1 -> leader re-elected to member 3, party has 1 member
+        simCore:Remove(1)
+        local countAfterLeader = getn(p.members)
+        local newLeaderId = p.leaderId
+        local leaderPartyId = leader.virtualPartyId
+
+        -- 3. Remove final member 3 -> party cleaned up from SimParty.parties
+        simCore:Remove(3)
+        local partyExists = (SimParty:GetParty(p.id) ~= nil)
+
+        return initialCount == 3, countAfterMem1 == 2, mem1PartyId == nil, countAfterLeader == 1, newLeaderId == 3, leaderPartyId == nil, partyExists == false
+        """)
+        c3, c2, m1_nil, c1, new_lead_3, l_nil, p_none = res
+        self.assertTrue(c3)
+        self.assertTrue(c2)
+        self.assertTrue(m1_nil)
+        self.assertTrue(c1)
+        self.assertTrue(new_lead_3)
+        self.assertTrue(l_nil)
+        self.assertTrue(p_none)
+
+    def test_sim_citizen_live_update_drives_party_movement_and_healing(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local runCalled = 0
+        local skillCast = 0
+        local skillIdCast = 0
+
+        NpcRun = function(idx, x, y)
+            runCalled = runCalled + 1
+        end
+
+        NpcCastSkill = function(idx, sk, lv, x, y)
+            skillCast = skillCast + 1
+            skillIdCast = sk
+        end
+
+        NPCINFO_GetNpcCurrentLife = function(idx)
+            if idx == 1002 then return 400 else return 1000 end
+        end
+        NPCINFO_GetNpcCurrentMaxLife = function(idx) return 1000 end
+        GetNpcPos = function(idx)
+            if idx == 1001 then return 3200, 3200, 53 -- Leader at (100, 100)
+            else return 3840, 3200, 53 end -- Follower at (120, 100)
+        end
+
+        local simCitizen = objCopy(SimCore)
+        simCitizen.fighterList = {}
+        simCitizen.removedIds = {}
+        simCitizen.totalFighters = 2
+        simCitizen.currentProcessGroup = 1
+
+        local leader = {
+            id = 1,
+            finalIndex = 1001,
+            faction = "ngami",
+            isDead = 0,
+            isFighting = 0,
+            tick_breath = 100,
+            processGroup = 1,
+            movementSys = { Move = function() end, IsActive = function() return 1 end },
+            fightSys = { Update = function() end },
+            funSys = { Update = function() end },
+            entitySys = { Update = function() end }
+        }
+
+        local follower = {
+            id = 2,
+            finalIndex = 1002,
+            faction = "thieulam",
+            isDead = 0,
+            isFighting = 0,
+            tick_breath = 100,
+            moveState = "IDLE",
+            processGroup = 1,
+            movementSys = { Move = function() end, IsActive = function() return 1 end },
+            fightSys = { Update = function() end },
+            funSys = { Update = function() end },
+            entitySys = { Update = function() end }
+        }
+
+        simCitizen.fighterList[1] = leader
+        simCitizen.fighterList[2] = follower
+
+        local p = SimParty:CreateParty(leader)
+        SimParty:JoinParty(p.id, follower)
+
+        -- Execute standard production tick: SimCitizen:ATick()
+        simCitizen:ATick(18)
+
+        return runCalled > 0, follower.moveState == "FOLLOW", skillCast == 1, skillIdCast == 93, p.lastHealTick > 100
+        """)
+        ran, follow_st, cast_ok, sk93, heal_adv = res
+        self.assertTrue(ran)
+        self.assertTrue(follow_st)
+        self.assertTrue(cast_ok)
+        self.assertTrue(sk93)
+        self.assertTrue(heal_adv)
+
+    def test_sim_citizen_live_combat_drives_party_shared_aggro(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local simCitizen = objCopy(SimCore)
+        simCitizen.fighterList = {}
+        simCitizen.removedIds = {}
+        simCitizen.totalFighters = 2
+        simCitizen.currentProcessGroup = 1
+
+        SimPickSkill = function(tbNpc) return { 318, 20 } end
+
+        local mem1 = {
+            id = 1,
+            finalIndex = 1001,
+            faction = "thieulam",
+            isDead = 0,
+            isFighting = 0,
+            tick_breath = 100,
+            foundNpcEnemy = 6006,
+            processGroup = 1,
+            movementSys = { Move = function() end },
+            fightSys = SimFight.Citizen,
+            funSys = { Update = function() end },
+            entitySys = { Update = function() end }
+        }
+
+        local mem2 = {
+            id = 2,
+            finalIndex = 1002,
+            faction = "vodang",
+            isDead = 0,
+            isFighting = 0,
+            tick_breath = 100,
+            foundNpcEnemy = nil,
+            processGroup = 1,
+            movementSys = { Move = function() end },
+            fightSys = SimFight.Citizen,
+            funSys = { Update = function() end },
+            entitySys = { Update = function() end }
+        }
+
+        simCitizen.fighterList[1] = mem1
+        simCitizen.fighterList[2] = mem2
+
+        GetNpcPos = function(idx)
+            return 3200, 3200, 53
+        end
+
+        local p = SimParty:CreateParty(mem1)
+        SimParty:JoinParty(p.id, mem2)
+
+        -- Execute fighting update on mem1
+        mem1.fightSys:Update(simCitizen, mem1)
+
+        return p.focusTarget == 6006, mem2.foundNpcEnemy == 6006, mem2.isFighting == 1, mem2.combatState == "AGGRO"
+        """)
+        f_target, m2_target, m2_fight, m2_aggro = res
+        self.assertTrue(f_target)
+        self.assertTrue(m2_target)
+        self.assertTrue(m2_fight)
+        self.assertTrue(m2_aggro)
 
     def test_phase_d_core_initialization_defaults(self):
         self.init_simcity_environment()

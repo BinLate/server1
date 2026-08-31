@@ -19,6 +19,7 @@ function SimParty:CreateParty(leaderNpc)
         leaderIndex = leaderNpc.finalIndex,
         members = { leaderNpc.id },
         mapId = leaderNpc.nMapId,
+        camp = leaderNpc.camp,
         focusTarget = nil,
         anchorX = leaderNpc.goX32 or 0,
         anchorY = leaderNpc.goY32 or 0,
@@ -47,30 +48,55 @@ function SimParty:JoinParty(partyId, tbNpc)
     return 1
 end
 
--- Leave party
-function SimParty:LeaveParty(tbNpc)
-    if not tbNpc or not tbNpc.virtualPartyId then return end
-    local p = self.parties[tbNpc.virtualPartyId]
+-- Leave party (supports tbNpc table or (nListId, partyId))
+function SimParty:LeaveParty(tbNpc, partyId)
+    if not tbNpc then return end
+    local pId = (type(tbNpc) == "table" and tbNpc.virtualPartyId) or partyId
+    local botId = (type(tbNpc) == "table" and tbNpc.id) or tbNpc
+    if not pId then return end
+
+    local p = self.parties[pId]
     if p then
         local newMems = {}
         for i = 1, getn(p.members) do
-            if p.members[i] ~= tbNpc.id then
+            if p.members[i] ~= botId then
                 tinsert(newMems, p.members[i])
             end
         end
         p.members = newMems
         if getn(p.members) == 0 then
-            self.parties[tbNpc.virtualPartyId] = nil
-        elseif p.leaderId == tbNpc.id then
+            self.parties[pId] = nil
+        elseif p.leaderId == botId then
             p.leaderId = p.members[1]
         end
     end
-    tbNpc.virtualPartyId = nil
+    if type(tbNpc) == "table" then
+        tbNpc.virtualPartyId = nil
+    end
 end
 
 function SimParty:GetParty(partyId)
     if not partyId then return nil end
     return self.parties[partyId]
+end
+
+-- Auto-form or join party for unpartied bots on the same map and camp
+function SimParty:AutoFormParty(simInstance, tbNpc)
+    if not tbNpc or tbNpc.virtualPartyId or tbNpc.isDead == 1 or not tbNpc.nMapId then
+        return nil
+    end
+
+    for pId, p in self.parties do
+        if p.mapId == tbNpc.nMapId and getn(p.members) < 8 then
+            local leader = simInstance and simInstance.Get and simInstance:Get(p.leaderId)
+            if leader and leader.isDead == 0 and (not tbNpc.camp or leader.camp == tbNpc.camp) then
+                self:JoinParty(pId, tbNpc)
+                return p
+            end
+        end
+    end
+
+    return self:CreateParty(tbNpc)
 end
 
 -- Broadcast aggro target across party
@@ -79,6 +105,7 @@ function SimParty:ShareAggroTarget(simInstance, partyId, attackerIdx, victimNpc)
     local p = self.parties[partyId]
     if not p or not simInstance then return end
 
+    if p.focusTarget == attackerIdx then return end
     p.focusTarget = attackerIdx
 
     for i = 1, getn(p.members) do

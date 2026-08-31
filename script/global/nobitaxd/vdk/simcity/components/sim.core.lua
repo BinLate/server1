@@ -196,6 +196,9 @@ function SimCore:Remove(nListId)
     if not nListId then return end
     local tbNpc = self.fighterList[nListId]
     if tbNpc then
+        if tbNpc.virtualPartyId and SimParty and SimParty.LeaveParty then
+            SimParty:LeaveParty(tbNpc)
+        end
         DelNpcSafe(tbNpc.finalIndex)
 
         if tbNpc.children then
@@ -1037,16 +1040,25 @@ function SimCore:OnTimer(tbNpc, rate)
         tbNpc.fightSys:Update(self, tbNpc)
     end
 
+    -- Virtual Party lifecycle tick: executed once per party by Leader
+    if tbNpc.virtualPartyId and SimParty and SimParty.parties then
+        local p = SimParty.parties[tbNpc.virtualPartyId]
+        if p and p.leaderId == tbNpc.id then
+            SimParty:UpdatePartyMovement(self, p.id)
+            SimParty:OnPartyTick(self, p.id)
+        end
+    end
+
 end
 
 function SimCore:ATick(rate)       
     if self.totalFighters <= 2000 then
-        for _, fighter in self.fighterList do
+        for _, fighter in pairs(self.fighterList) do
             self:OnTimer(fighter, rate)
         end
         return
     end 
-    for _, fighter in self.fighterList do
+    for _, fighter in pairs(self.fighterList) do
         if fighter.processGroup == self.currentProcessGroup then
             self:OnTimer(fighter, rate)
         end
