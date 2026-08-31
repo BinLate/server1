@@ -252,6 +252,11 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         return
     end
 
+    -- Broadcast to virtual party if member acquired target
+    if tbNpc.virtualPartyId and SimParty and SimParty.ShareAggroTarget and target.npcIndex and target.npcIndex > 0 then
+        SimParty:ShareAggroTarget(simInstance, tbNpc.virtualPartyId, target.npcIndex, tbNpc)
+    end
+
     local selectedSkill = SimPickSkill(tbNpc)
     if not selectedSkill or not selectedSkill[1] then return end
     local skillId = selectedSkill[1]

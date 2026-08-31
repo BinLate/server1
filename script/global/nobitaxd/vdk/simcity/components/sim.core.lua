@@ -182,6 +182,11 @@ function SimCore:initCharConfig(config)
         config.combatState = SIM_COMBAT_STATE.PEACE
     end
     config.stuckTicks = 0
+    config.personality = config.personality or "friendly"
+    config.lastChatTick = 0
+    config.lastWorldChatTick = 0
+    config.virtualPartyId = config.virtualPartyId or nil
+    config.isSitting = 0
 
 
 end
@@ -191,6 +196,9 @@ function SimCore:Remove(nListId)
     if not nListId then return end
     local tbNpc = self.fighterList[nListId]
     if tbNpc then
+        if tbNpc.virtualPartyId and SimParty and SimParty.LeaveParty then
+            SimParty:LeaveParty(tbNpc)
+        end
         DelNpcSafe(tbNpc.finalIndex)
 
         if tbNpc.children then
@@ -1032,16 +1040,31 @@ function SimCore:OnTimer(tbNpc, rate)
         tbNpc.fightSys:Update(self, tbNpc)
     end
 
+    -- Virtual Party lifecycle tick: executed once per party by Leader, or auto-form party for unpartied bots
+    if SimParty then
+        if tbNpc.virtualPartyId and SimParty.parties then
+            local p = SimParty.parties[tbNpc.virtualPartyId]
+            if p and p.leaderId == tbNpc.id then
+                SimParty:UpdatePartyMovement(self, p.id)
+                SimParty:OnPartyTick(self, p.id)
+            end
+        elseif (not tbNpc.virtualPartyId) and tbNpc.isDead == 0 and tbNpc.isFighting == 0 
+           and (not tbNpc.tongkim or tbNpc.tongkim ~= 1) and (not tbNpc.duelPlayerId) and (not tbNpc.partyPlayerId)
+           and mod(tbNpc.tick_breath, 10*18/REFRESH_RATE) == 0 and SimParty.AutoFormParty then
+            SimParty:AutoFormParty(self, tbNpc)
+        end
+    end
+
 end
 
 function SimCore:ATick(rate)       
     if self.totalFighters <= 2000 then
-        for _, fighter in self.fighterList do
+        for _, fighter in pairs(self.fighterList) do
             self:OnTimer(fighter, rate)
         end
         return
     end 
-    for _, fighter in self.fighterList do
+    for _, fighter in pairs(self.fighterList) do
         if fighter.processGroup == self.currentProcessGroup then
             self:OnTimer(fighter, rate)
         end
