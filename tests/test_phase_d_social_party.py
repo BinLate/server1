@@ -1,3 +1,12 @@
+def _convert_kingsoft_for_loops(src):
+    import re
+    def repl(m):
+        target = m.group(2).strip()
+        if '(' in target or target.startswith('pairs') or target.startswith('ipairs') or target.startswith('next'):
+            return m.group(0)
+        return f'for {m.group(1)} in pairs({target}) do'
+    return re.sub(r'\bfor\s+([a-zA-Z0-9_,\s]+)\s+in\s+([^()\r\n]+?)\s+do\b', repl, src)
+
 import unittest
 import os
 import shutil
@@ -16,10 +25,12 @@ class TestPhaseDSocialParty(unittest.TestCase):
             shutil.rmtree("save/simcity", ignore_errors=True)
 
     def load_lua_file(self, rel_path):
+        import re
         with open(rel_path, "r", encoding="latin1") as f:
             code = f.read()
         code = re.sub(r'/\*.*?\*/', '', code, flags=re.DOTALL)
         code = re.sub(r'//.*$', '', code, flags=re.MULTILINE)
+        code = _convert_kingsoft_for_loops(code)
         return self.lua.execute(code)
 
     def init_simcity_environment(self):

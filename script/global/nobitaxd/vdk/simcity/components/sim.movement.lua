@@ -400,7 +400,7 @@ SimMovement.Citizen = {
             local currentPath = tbNpc.worldInfo.presetPaths[tbNpc.currentPathIndex]
             local currentNodeName = currentPath[tbNpc.currentPointIndex]
             local nodes = {}
-            for k,v in pairs(tbNpc.worldInfo.nodes) do
+            for k,v in tbNpc.worldInfo.nodes do
                 if v.nodeType == 1 then
                     nodes[k] = {v.x, v.y, v.linkedNodes}
                 end
@@ -700,14 +700,14 @@ SimMovement.Citizen = {
         
         -- Otherwise pick a random node
         local nodeCount = 0
-        for id, _ in pairs(tbNpc.worldInfo.nodes) do
+        for id, _ in tbNpc.worldInfo.nodes do
             nodeCount = nodeCount + 1
         end
         if nodeCount == 0 then return nil end
 
         local targetIndex = random(1, nodeCount)
         local currentIndex = 0
-        for id, _ in pairs(tbNpc.worldInfo.nodes) do
+        for id, _ in tbNpc.worldInfo.nodes do
             currentIndex = currentIndex + 1
             if currentIndex == targetIndex then
                 return id

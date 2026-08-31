@@ -86,7 +86,7 @@ function SimParty:AutoFormParty(simInstance, tbNpc)
         return nil
     end
 
-    for pId, p in pairs(self.parties) do
+    for pId, p in self.parties do
         if p.mapId == tbNpc.nMapId and getn(p.members) < 8 then
             local leader = simInstance and simInstance.Get and simInstance:Get(p.leaderId)
             if leader and leader.isDead == 0 and (not tbNpc.camp or leader.camp == tbNpc.camp) then

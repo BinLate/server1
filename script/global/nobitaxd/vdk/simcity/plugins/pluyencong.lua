@@ -221,7 +221,7 @@ function SimCityLuyenCong:hibernateMap(mapId)
     local curMapConfig = mapIdx and self.TRAIN_MAPS[mapIdx]
 
     if SimCitizen and SimCitizen.fighterList then
-        for id, bot in pairs(SimCitizen.fighterList) do
+        for id, bot in SimCitizen.fighterList do
             if bot.mode == "train" and bot.nMapId == mapId then
                 local botData = {
                     szName = bot.szName or "DocCoCauBai",
@@ -249,7 +249,7 @@ function SimCityLuyenCong:hibernateMap(mapId)
     if SimProgression and SimProgression.SaveTrainBots then
         SimProgression:SaveTrainBots(mapId, rosterToSave)
         -- Save migrated bots into target higher tier map rosters
-        for targetMapId, mList in pairs(migratedBots) do
+        for targetMapId, mList in migratedBots do
             local targetRoster = SimProgression:LoadTrainBots(targetMapId) or {}
             for k = 1, getn(mList) do
                 tinsert(targetRoster, mList[k])

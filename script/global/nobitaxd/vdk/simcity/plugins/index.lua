@@ -1,6 +1,7 @@
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\plugins\\pngoaitrang.lua")
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\plugins\\pworld.lua")
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\plugins\\pnpcinfo.lua")
+Include("\\script\\global\\nobitaxd\\vdk\\simcity\\plugins\\pchat.lua")
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\plugins\\pchientranh.lua")
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\plugins\\ptongkim.lua")
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\plugins\\pkeoxe.lua")
