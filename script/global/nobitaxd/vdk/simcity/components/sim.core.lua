@@ -175,6 +175,14 @@ function SimCore:initCharConfig(config)
     config.entitySys = SimEntitySys(config)
     config.fightSys = SimFightSys(config)
 
+    if SIM_MOVE_STATE then
+        config.moveState = (config.role == "keoxe" or config.role == "child") and SIM_MOVE_STATE.FOLLOW or SIM_MOVE_STATE.WANDER
+    end
+    if SIM_COMBAT_STATE then
+        config.combatState = SIM_COMBAT_STATE.PEACE
+    end
+    config.stuckTicks = 0
+
 
 end
 
