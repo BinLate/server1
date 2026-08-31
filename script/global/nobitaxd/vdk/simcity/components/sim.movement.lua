@@ -105,9 +105,9 @@ function SimMovement:CheckStuck(tbNpc, curTileX, curTileY)
         return 0
     end
 
-    -- If fighting and intentionally stationary/casting, don't falsely accumulate stuck ticks
+    -- If fighting and in stationary COMBO / COOLDOWN or cooling down, suppress stuck accumulation unconditionally
     local cst = tbNpc.combatState
-    if tbNpc.isFighting == 1 and (cst == "COMBO" or cst == "COOLDOWN") and st ~= SIM_MOVE_STATE.CHASE and st ~= SIM_MOVE_STATE.KITE then
+    if tbNpc.isFighting == 1 and (cst == "COMBO" or cst == "COOLDOWN" or (tbNpc.tick_canCast and tbNpc.tick_canCast > (tbNpc.tick_breath or 0))) then
         tbNpc.stuckTicks = 0
         tbNpc.lastMoveTileX = curTileX
         tbNpc.lastMoveTileY = curTileY

@@ -304,6 +304,7 @@ function execCastNormalSkill(self, simInstance, tbNpc)
 
     -- Cast skill combo
     SimFight:SetCombatState(tbNpc, SIM_COMBAT_STATE.COMBO, "casting combo")
+    if SimMovement then SimMovement:SetState(tbNpc, SIM_MOVE_STATE.IDLE, "casting combo stationary") end
     SimApplyHorseCombat(tbNpc, skillId)
 
     if target.targetType == "player" then

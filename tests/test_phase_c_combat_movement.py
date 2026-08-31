@@ -498,5 +498,102 @@ class TestPhaseCCombatMovement(unittest.TestCase):
         self.assertEqual(s5, 0)
         self.assertEqual(tTicks, 0)
 
+    def test_combat_chase_to_combo_suppresses_stuck_recovery(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local dashCalled = 0
+        BotDashTo = function(idx, x, y, speed) dashCalled = dashCalled + 1 end
+
+        local tbNpc = {
+            finalIndex = 1001,
+            faction = "thieulam",
+            weaponBranch = "dao",
+            level = 100,
+            nMapId = 53,
+            fighting = 1,
+            isFighting = 1,
+            moveState = SIM_MOVE_STATE.CHASE,
+            combatState = SIM_COMBAT_STATE.ENGAGING,
+            tick_breath = 100,
+            tick_canCast = 0,
+            foundNpcEnemy = 2002,
+            stuckTicks = 0
+        }
+
+        -- Step 1: Enemy is within cast range (tile 101, 100) -> execCastNormalSkill enters COMBO
+        GetNpcPos = function(idx)
+            if idx == 1001 then return 3200, 3200, 53
+            else return 3232, 3200, 53 end
+        end
+
+        execCastNormalSkill(SimFight.Citizen, nil, tbNpc)
+        local cState = tbNpc.combatState
+        local mState = tbNpc.moveState
+
+        -- Step 2: 5 subsequent checks while casting/cooling down at same coordinate (100, 100)
+        local s1 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s2 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s3 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s4 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s5 = SimMovement:CheckStuck(tbNpc, 100, 100)
+
+        return cState, mState, s5, dashCalled, tbNpc.stuckTicks
+        """)
+        cState, mState, s5, dashes, stuckTicks = res
+        self.assertEqual(cState, "COMBO")
+        self.assertEqual(mState, "IDLE")
+        self.assertEqual(s5, 0)
+        self.assertEqual(dashes, 0)
+        self.assertEqual(stuckTicks, 0)
+
+    def test_combat_kite_to_combo_suppresses_stuck_recovery(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local dashCalled = 0
+        BotDashTo = function(idx, x, y, speed) dashCalled = dashCalled + 1 end
+
+        local tbNpc = {
+            finalIndex = 1001,
+            faction = "ngami",
+            weaponBranch = "chuong",
+            level = 100,
+            nMapId = 53,
+            fighting = 1,
+            isFighting = 1,
+            moveState = SIM_MOVE_STATE.KITE,
+            combatState = SIM_COMBAT_STATE.KITE,
+            tick_breath = 100,
+            tick_canCast = 0,
+            foundNpcEnemy = 2002,
+            stuckTicks = 0
+        }
+
+        -- Step 1: Enemy is at distance 6 (within max cast range, safe distance >= 4) -> enters COMBO
+        SimProgression.GetSkillAttackRadiusTiles = function(self, sk) return 6 end
+        GetNpcPos = function(idx)
+            if idx == 1001 then return 3200, 3200, 53
+            else return 3392, 3200, 53 end
+        end
+
+        execCastNormalSkill(SimFight.Citizen, nil, tbNpc)
+        local cState = tbNpc.combatState
+        local mState = tbNpc.moveState
+
+        -- Step 2: 5 checks while stationary casting
+        local s1 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s2 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s3 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s4 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s5 = SimMovement:CheckStuck(tbNpc, 100, 100)
+
+        return cState, mState, s5, dashCalled, tbNpc.stuckTicks
+        """)
+        cState, mState, s5, dashes, stuckTicks = res
+        self.assertEqual(cState, "COMBO")
+        self.assertEqual(mState, "IDLE")
+        self.assertEqual(s5, 0)
+        self.assertEqual(dashes, 0)
+        self.assertEqual(stuckTicks, 0)
+
 if __name__ == '__main__':
     unittest.main()
