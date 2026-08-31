@@ -122,12 +122,10 @@ class TestPhaseBProgression(unittest.TestCase):
             return io.open(path, mode)
         end
         closefile = function(f)
-            if f and f.close then return f:close() end
-            return 1
+            if f then f:close() end
         end
         flushfile = function(f)
-            if f and f.flush then return f:flush() end
-            return 1
+            if f and f.flush then f:flush() end
         end
         read = function(f, mode)
             if f then return f:read(mode) end
@@ -684,7 +682,52 @@ class TestPhaseBProgression(unittest.TestCase):
         self.assertEqual(hLv, 100)
         self.assertFalse(tmpExists)
 
-    def test_crash_safe_roster_flush_close_failure_preserves_old_data(self):
+    def test_crash_safe_roster_void_return_close_flush_succeeds(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local mapId = 53
+
+        -- 1. Ensure closefile and flushfile execute procedures and return nothing (nil, nil)
+        local old_close = closefile
+        local old_flush = flushfile
+        local close_called = false
+        local flush_called = false
+
+        closefile = function(f)
+            if f and f.close then f:close() end
+            close_called = true
+            -- returns nothing (nil, nil)
+        end
+        flushfile = function(f)
+            if f and f.flush then f:flush() end
+            flush_called = true
+            -- returns nothing (nil, nil)
+        end
+
+        local roster = {
+            { szName = "VoidReturnHero", level = 120, nExp = 15000, faction = "thieulam", series = 1, weaponBranch = "dao", nNpcId = 101, camp = 0, personality = "balanced" }
+        }
+        local saveOk = SimProgression:SaveTrainBots(mapId, roster)
+
+        closefile = old_close
+        flushfile = old_flush
+
+        local loaded = SimProgression:LoadTrainBots(mapId)
+        local count = getn(loaded)
+        local heroName = count > 0 and loaded[1].szName or ""
+        local heroLv = count > 0 and loaded[1].level or 0
+
+        return saveOk == 1, close_called, flush_called, count, heroName, heroLv
+        """)
+        saveOk, close_called, flush_called, cnt, hName, hLv = res
+        self.assertTrue(saveOk)
+        self.assertTrue(close_called)
+        self.assertTrue(flush_called)
+        self.assertEqual(cnt, 1)
+        self.assertEqual(hName, "VoidReturnHero")
+        self.assertEqual(hLv, 120)
+
+    def test_crash_safe_roster_flush_failure_preserves_old_data(self):
         self.init_simcity_environment()
         res = self.lua.execute("""
         local mapId = 53
@@ -695,11 +738,57 @@ class TestPhaseBProgression(unittest.TestCase):
         }
         local saveOkA = SimProgression:SaveTrainBots(mapId, rosterA)
 
-        -- 2. Mock closefile failure during subsequent save attempt
+        -- 2. Mock flushfile returning nil, "Flush disk error"
+        local old_flush = flushfile
+        flushfile = function(f)
+            return nil, "Flush disk error"
+        end
+
+        -- 3. Attempt to save Roster B (which will fail during _sim_flush)
+        local rosterB = {
+            { szName = "FailedHeroB", level = 150, nExp = 25000, faction = "vodang", series = 3, weaponBranch = "kiem", nNpcId = 105, camp = 5, personality = "aggressive" }
+        }
+        local saveRetB = SimProgression:SaveTrainBots(mapId, rosterB)
+
+        flushfile = old_flush
+
+        -- 4. Load roster from disk -> must remain intact as Roster A
+        local loaded = SimProgression:LoadTrainBots(mapId)
+        local count = getn(loaded)
+        local heroName = count > 0 and loaded[1].szName or ""
+        local heroLv = count > 0 and loaded[1].level or 0
+
+        -- 5. Verify no .tmp file remains
+        local tmpFile = io.open("save/simcity/train_map_53.dat.tmp", "r")
+        local tmpExists = tmpFile ~= nil
+        if tmpFile then tmpFile:close() end
+
+        return saveOkA == 1, saveRetB, count, heroName, heroLv, tmpExists
+        """)
+        okA, retB, cnt, hName, hLv, tmpExists = res
+        self.assertTrue(okA)
+        self.assertEqual(retB, 0)
+        self.assertEqual(cnt, 1)
+        self.assertEqual(hName, "OldHeroA")
+        self.assertEqual(hLv, 100)
+        self.assertFalse(tmpExists)
+
+    def test_crash_safe_roster_close_failure_preserves_old_data(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local mapId = 53
+
+        -- 1. Initial valid save of Roster A
+        local rosterA = {
+            { szName = "OldHeroA", level = 100, nExp = 5000, faction = "thieulam", series = 1, weaponBranch = "dao", nNpcId = 101, camp = 0, personality = "balanced" }
+        }
+        local saveOkA = SimProgression:SaveTrainBots(mapId, rosterA)
+
+        -- 2. Mock closefile failure returning nil, "Close I/O error"
         local old_close = closefile
         closefile = function(f)
             if f and f.close then f:close() end
-            return nil, "Flush close error"
+            return nil, "Close I/O error"
         end
 
         -- 3. Attempt to save Roster B (which will fail during _sim_close)
@@ -708,7 +797,6 @@ class TestPhaseBProgression(unittest.TestCase):
         }
         local saveRetB = SimProgression:SaveTrainBots(mapId, rosterB)
 
-        -- Restore original closefile
         closefile = old_close
 
         -- 4. Load roster from disk -> must remain intact as Roster A
@@ -727,6 +815,64 @@ class TestPhaseBProgression(unittest.TestCase):
         okA, retB, cnt, hName, hLv, tmpExists = res
         self.assertTrue(okA)
         self.assertEqual(retB, 0)
+        self.assertEqual(cnt, 1)
+        self.assertEqual(hName, "OldHeroA")
+        self.assertEqual(hLv, 100)
+        self.assertFalse(tmpExists)
+
+    def test_crash_safe_roster_close_false_or_throw_preserves_old_data(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local mapId = 53
+
+        -- 1. Initial valid save of Roster A
+        local rosterA = {
+            { szName = "OldHeroA", level = 100, nExp = 5000, faction = "thieulam", series = 1, weaponBranch = "dao", nNpcId = 101, camp = 0, personality = "balanced" }
+        }
+        local saveOkA = SimProgression:SaveTrainBots(mapId, rosterA)
+
+        -- 2. Mock closefile returning false / 0
+        local old_close = closefile
+        closefile = function(f)
+            if f and f.close then f:close() end
+            return false
+        end
+
+        local rosterB = {
+            { szName = "FailedHeroB", level = 150, nExp = 25000, faction = "vodang", series = 3, weaponBranch = "kiem", nNpcId = 105, camp = 5, personality = "aggressive" }
+        }
+        local saveRetB = SimProgression:SaveTrainBots(mapId, rosterB)
+
+        -- 3. Mock closefile throwing an error
+        closefile = function(f)
+            if f and f.close then f:close() end
+            error("Fatal close exception")
+        end
+
+        local rosterC = {
+            { szName = "FailedHeroC", level = 180, nExp = 35000, faction = "cai bang", series = 4, weaponBranch = "bong", nNpcId = 108, camp = 1, personality = "cautious" }
+        }
+        local saveRetC = SimProgression:SaveTrainBots(mapId, rosterC)
+
+        closefile = old_close
+
+        -- 4. Load roster from disk -> must remain intact as Roster A
+        local loaded = SimProgression:LoadTrainBots(mapId)
+        local count = getn(loaded)
+        local heroName = count > 0 and loaded[1].szName or ""
+        local heroLv = count > 0 and loaded[1].level or 0
+
+        -- 5. Verify no .tmp file remains
+        local tmpFile = io.open("save/simcity/train_map_53.dat.tmp", "r")
+        local tmpExists = tmpFile ~= nil
+        if tmpFile then tmpFile:close() end
+
+        return saveOkA == 1, saveRetB, saveRetC, count, heroName, heroLv, tmpExists
+        """)
+        okA, retB, retC, cnt, hName, hLv, tmpExists = res
+        self.assertTrue(okA)
+        self.assertEqual(retB, 0)
+        self.assertEqual(retC, 0)
         self.assertEqual(cnt, 1)
         self.assertEqual(hName, "OldHeroA")
         self.assertEqual(hLv, 100)

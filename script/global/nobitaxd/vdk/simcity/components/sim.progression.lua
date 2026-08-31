@@ -620,13 +620,17 @@ end
 local function _sim_flush(f)
     if not f then return 0 end
     if flushfile then
-        local ok, res = pcall(flushfile, f)
-        if not ok or res == nil or res == false or res == 0 then return 0 end
+        local ok, res, err = pcall(flushfile, f)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
         return 1
     end
     if f.flush then
-        local ok, res = pcall(function() return f:flush() end)
-        if not ok or res == nil or res == false or res == 0 then return 0 end
+        local ok, res, err = pcall(function() return f:flush() end)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
         return 1
     end
     return 1
@@ -634,13 +638,17 @@ end
 local function _sim_close(f)
     if not f then return 0 end
     if closefile then
-        local ok, res = pcall(closefile, f)
-        if not ok or res == nil or res == false or res == 0 then return 0 end
+        local ok, res, err = pcall(closefile, f)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
         return 1
     end
     if f.close then
-        local ok, res = pcall(function() return f:close() end)
-        if not ok or res == nil or res == false or res == 0 then return 0 end
+        local ok, res, err = pcall(function() return f:close() end)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
         return 1
     end
     return 0
@@ -654,13 +662,17 @@ end
 local function _sim_write(f, str)
     if not f or not str then return 0 end
     if write then
-        local ok, res = pcall(write, f, str)
-        if not ok or res == nil or res == false or res == 0 then return 0 end
+        local ok, res, err = pcall(write, f, str)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
         return 1
     end
     if f.write then
-        local ok, res = pcall(function() return f:write(str) end)
-        if not ok or res == nil or res == false or res == 0 then return 0 end
+        local ok, res, err = pcall(function() return f:write(str) end)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
         return 1
     end
     return 0
