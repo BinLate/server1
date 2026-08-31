@@ -118,7 +118,12 @@ class TestPhaseASafety(unittest.TestCase):
             return io.open(path, mode)
         end
         closefile = function(f)
-            if f then f:close() end
+            if f and f.close then return f:close() end
+            return 1
+        end
+        flushfile = function(f)
+            if f and f.flush then return f:flush() end
+            return 1
         end
         read = function(f, mode)
             if f then return f:read(mode) end

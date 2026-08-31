@@ -617,10 +617,33 @@ local function _sim_open(path, mode)
     if io and io.open then return io.open(path, mode) end
     return nil
 end
+local function _sim_flush(f)
+    if not f then return 0 end
+    if flushfile then
+        local ok, res = pcall(flushfile, f)
+        if not ok or res == nil or res == false or res == 0 then return 0 end
+        return 1
+    end
+    if f.flush then
+        local ok, res = pcall(function() return f:flush() end)
+        if not ok or res == nil or res == false or res == 0 then return 0 end
+        return 1
+    end
+    return 1
+end
 local function _sim_close(f)
-    if not f then return end
-    if closefile then return closefile(f) end
-    if f.close then return f:close() end
+    if not f then return 0 end
+    if closefile then
+        local ok, res = pcall(closefile, f)
+        if not ok or res == nil or res == false or res == 0 then return 0 end
+        return 1
+    end
+    if f.close then
+        local ok, res = pcall(function() return f:close() end)
+        if not ok or res == nil or res == false or res == 0 then return 0 end
+        return 1
+    end
+    return 0
 end
 local function _sim_read(f, mode)
     if not f then return nil end
@@ -704,7 +727,21 @@ function SimProgression:SaveTrainBots(mapId, botList)
         end
     end
 
-    _sim_close(f)
+    local flOk = _sim_flush(f)
+    if flOk ~= 1 then
+        _sim_close(f)
+        if removefile then pcall(removefile, szTmpPath) end
+        if os and os.remove then pcall(os.remove, szTmpPath) end
+        return 0
+    end
+
+    local clOk = _sim_close(f)
+    if clOk ~= 1 then
+        if removefile then pcall(removefile, szTmpPath) end
+        if os and os.remove then pcall(os.remove, szTmpPath) end
+        return 0
+    end
+
     local renOk = _sim_rename(szTmpPath, szPath)
     if renOk ~= 1 then
         if removefile then pcall(removefile, szTmpPath) end

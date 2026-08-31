@@ -122,7 +122,12 @@ class TestPhaseBProgression(unittest.TestCase):
             return io.open(path, mode)
         end
         closefile = function(f)
-            if f then f:close() end
+            if f and f.close then return f:close() end
+            return 1
+        end
+        flushfile = function(f)
+            if f and f.flush then return f:flush() end
+            return 1
         end
         read = function(f, mode)
             if f then return f:read(mode) end
@@ -657,6 +662,54 @@ class TestPhaseBProgression(unittest.TestCase):
 
         -- Restore original write
         write = old_write
+
+        -- 4. Load roster from disk -> must remain intact as Roster A
+        local loaded = SimProgression:LoadTrainBots(mapId)
+        local count = getn(loaded)
+        local heroName = count > 0 and loaded[1].szName or ""
+        local heroLv = count > 0 and loaded[1].level or 0
+
+        -- 5. Verify no .tmp file remains
+        local tmpFile = io.open("save/simcity/train_map_53.dat.tmp", "r")
+        local tmpExists = tmpFile ~= nil
+        if tmpFile then tmpFile:close() end
+
+        return saveOkA == 1, saveRetB, count, heroName, heroLv, tmpExists
+        """)
+        okA, retB, cnt, hName, hLv, tmpExists = res
+        self.assertTrue(okA)
+        self.assertEqual(retB, 0)
+        self.assertEqual(cnt, 1)
+        self.assertEqual(hName, "OldHeroA")
+        self.assertEqual(hLv, 100)
+        self.assertFalse(tmpExists)
+
+    def test_crash_safe_roster_flush_close_failure_preserves_old_data(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local mapId = 53
+
+        -- 1. Initial valid save of Roster A
+        local rosterA = {
+            { szName = "OldHeroA", level = 100, nExp = 5000, faction = "thieulam", series = 1, weaponBranch = "dao", nNpcId = 101, camp = 0, personality = "balanced" }
+        }
+        local saveOkA = SimProgression:SaveTrainBots(mapId, rosterA)
+
+        -- 2. Mock closefile failure during subsequent save attempt
+        local old_close = closefile
+        closefile = function(f)
+            if f and f.close then f:close() end
+            return nil, "Flush close error"
+        end
+
+        -- 3. Attempt to save Roster B (which will fail during _sim_close)
+        local rosterB = {
+            { szName = "FailedHeroB", level = 150, nExp = 25000, faction = "vodang", series = 3, weaponBranch = "kiem", nNpcId = 105, camp = 5, personality = "aggressive" }
+        }
+        local saveRetB = SimProgression:SaveTrainBots(mapId, rosterB)
+
+        -- Restore original closefile
+        closefile = old_close
 
         -- 4. Load roster from disk -> must remain intact as Roster A
         local loaded = SimProgression:LoadTrainBots(mapId)
