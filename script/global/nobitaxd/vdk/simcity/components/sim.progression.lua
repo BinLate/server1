@@ -682,13 +682,18 @@ end
 -- on the same filesystem without requiring pre-deletion. renamefile in JX1 C-engine maps directly to this syscall.
 local function _sim_rename(oldp, newp)
     if renamefile then
-        local r1, r2 = pcall(renamefile, oldp, newp)
-        if r1 and (r2 == 1 or r2 == true) then return 1 end
-        return 0
+        local ok, res, err = pcall(renamefile, oldp, newp)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
+        return 1
     end
     if os and os.rename then
-        local ok, err = os.rename(oldp, newp)
-        if ok then return 1 end
+        local ok, res, err = pcall(os.rename, oldp, newp)
+        if not ok then return 0 end
+        if res == false or res == 0 then return 0 end
+        if res == nil and err ~= nil then return 0 end
+        return 1
     end
     return 0
 end

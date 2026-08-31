@@ -137,11 +137,11 @@ class TestPhaseBProgression(unittest.TestCase):
         end
         renamefile = function(oldp, newp)
             if os_replace then
-                local ok, err = pcall(os_replace, oldp, newp)
-                if ok then return 1 else return nil, err end
+                os_replace(oldp, newp)
+                return
             end
             local ok, err = os.rename(oldp, newp)
-            if ok then return 1 else return nil, err end
+            if not ok then return nil, err end
         end
         """
         self.lua.execute(mock_env)
@@ -855,6 +855,149 @@ class TestPhaseBProgression(unittest.TestCase):
         local saveRetC = SimProgression:SaveTrainBots(mapId, rosterC)
 
         closefile = old_close
+
+        -- 4. Load roster from disk -> must remain intact as Roster A
+        local loaded = SimProgression:LoadTrainBots(mapId)
+        local count = getn(loaded)
+        local heroName = count > 0 and loaded[1].szName or ""
+        local heroLv = count > 0 and loaded[1].level or 0
+
+        -- 5. Verify no .tmp file remains
+        local tmpFile = io.open("save/simcity/train_map_53.dat.tmp", "r")
+        local tmpExists = tmpFile ~= nil
+        if tmpFile then tmpFile:close() end
+
+        return saveOkA == 1, saveRetB, saveRetC, count, heroName, heroLv, tmpExists
+        """)
+        okA, retB, retC, cnt, hName, hLv, tmpExists = res
+        self.assertTrue(okA)
+        self.assertEqual(retB, 0)
+        self.assertEqual(retC, 0)
+        self.assertEqual(cnt, 1)
+        self.assertEqual(hName, "OldHeroA")
+        self.assertEqual(hLv, 100)
+        self.assertFalse(tmpExists)
+
+    def test_crash_safe_roster_void_return_rename_succeeds(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local mapId = 53
+
+        -- 1. Mock renamefile that performs the rename but returns nothing (nil, nil)
+        local old_rename = renamefile
+        local rename_called = false
+
+        renamefile = function(oldp, newp)
+            rename_called = true
+            if os_replace then
+                os_replace(oldp, newp)
+                return
+            end
+            local ok, err = os.rename(oldp, newp)
+            if not ok then return nil, err end
+            -- returns nothing (nil, nil) on success
+        end
+
+        local roster = {
+            { szName = "VoidRenameHero", level = 135, nExp = 20000, faction = "vodang", series = 3, weaponBranch = "kiem", nNpcId = 105, camp = 5, personality = "aggressive" }
+        }
+        local saveOk = SimProgression:SaveTrainBots(mapId, roster)
+
+        renamefile = old_rename
+
+        local loaded = SimProgression:LoadTrainBots(mapId)
+        local count = getn(loaded)
+        local heroName = count > 0 and loaded[1].szName or ""
+        local heroLv = count > 0 and loaded[1].level or 0
+
+        return saveOk == 1, rename_called, count, heroName, heroLv
+        """)
+        saveOk, rename_called, cnt, hName, hLv = res
+        self.assertTrue(saveOk)
+        self.assertTrue(rename_called)
+        self.assertEqual(cnt, 1)
+        self.assertEqual(hName, "VoidRenameHero")
+        self.assertEqual(hLv, 135)
+
+    def test_crash_safe_roster_rename_nil_error_preserves_old_data(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local mapId = 53
+
+        -- 1. Initial valid save of Roster A
+        local rosterA = {
+            { szName = "OldHeroA", level = 100, nExp = 5000, faction = "thieulam", series = 1, weaponBranch = "dao", nNpcId = 101, camp = 0, personality = "balanced" }
+        }
+        local saveOkA = SimProgression:SaveTrainBots(mapId, rosterA)
+
+        -- 2. Mock renamefile returning nil, "Rename permission error"
+        local old_rename = renamefile
+        renamefile = function(oldp, newp)
+            return nil, "Rename permission error"
+        end
+
+        -- 3. Attempt to save Roster B (which will fail during _sim_rename)
+        local rosterB = {
+            { szName = "FailedHeroB", level = 150, nExp = 25000, faction = "vodang", series = 3, weaponBranch = "kiem", nNpcId = 105, camp = 5, personality = "aggressive" }
+        }
+        local saveRetB = SimProgression:SaveTrainBots(mapId, rosterB)
+
+        renamefile = old_rename
+
+        -- 4. Load roster from disk -> must remain intact as Roster A
+        local loaded = SimProgression:LoadTrainBots(mapId)
+        local count = getn(loaded)
+        local heroName = count > 0 and loaded[1].szName or ""
+        local heroLv = count > 0 and loaded[1].level or 0
+
+        -- 5. Verify no .tmp file remains
+        local tmpFile = io.open("save/simcity/train_map_53.dat.tmp", "r")
+        local tmpExists = tmpFile ~= nil
+        if tmpFile then tmpFile:close() end
+
+        return saveOkA == 1, saveRetB, count, heroName, heroLv, tmpExists
+        """)
+        okA, retB, cnt, hName, hLv, tmpExists = res
+        self.assertTrue(okA)
+        self.assertEqual(retB, 0)
+        self.assertEqual(cnt, 1)
+        self.assertEqual(hName, "OldHeroA")
+        self.assertEqual(hLv, 100)
+        self.assertFalse(tmpExists)
+
+    def test_crash_safe_roster_rename_false_or_throw_preserves_old_data(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local mapId = 53
+
+        -- 1. Initial valid save of Roster A
+        local rosterA = {
+            { szName = "OldHeroA", level = 100, nExp = 5000, faction = "thieulam", series = 1, weaponBranch = "dao", nNpcId = 101, camp = 0, personality = "balanced" }
+        }
+        local saveOkA = SimProgression:SaveTrainBots(mapId, rosterA)
+
+        -- 2. Mock renamefile returning false / 0
+        local old_rename = renamefile
+        renamefile = function(oldp, newp)
+            return false
+        end
+
+        local rosterB = {
+            { szName = "FailedHeroB", level = 150, nExp = 25000, faction = "vodang", series = 3, weaponBranch = "kiem", nNpcId = 105, camp = 5, personality = "aggressive" }
+        }
+        local saveRetB = SimProgression:SaveTrainBots(mapId, rosterB)
+
+        -- 3. Mock renamefile throwing an error
+        renamefile = function(oldp, newp)
+            error("Fatal rename exception")
+        end
+
+        local rosterC = {
+            { szName = "FailedHeroC", level = 180, nExp = 35000, faction = "cai bang", series = 4, weaponBranch = "bong", nNpcId = 108, camp = 1, personality = "cautious" }
+        }
+        local saveRetC = SimProgression:SaveTrainBots(mapId, rosterC)
+
+        renamefile = old_rename
 
         -- 4. Load roster from disk -> must remain intact as Roster A
         local loaded = SimProgression:LoadTrainBots(mapId)

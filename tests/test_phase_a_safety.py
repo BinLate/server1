@@ -133,11 +133,11 @@ class TestPhaseASafety(unittest.TestCase):
         end
         renamefile = function(oldp, newp)
             if os_replace then
-                local ok, err = pcall(os_replace, oldp, newp)
-                if ok then return 1 else return nil, err end
+                os_replace(oldp, newp)
+                return
             end
             local ok, err = os.rename(oldp, newp)
-            if ok then return 1 else return nil, err end
+            if not ok then return nil, err end
         end
         """
         self.lua.execute(mock_env)
