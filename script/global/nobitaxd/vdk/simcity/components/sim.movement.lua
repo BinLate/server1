@@ -66,7 +66,93 @@ function IsActive(self, simInstance,tbNpc)
     return 0
 end
 
-SimMovement = {}
+SIM_MOVE_STATE = {
+    IDLE = "IDLE",
+    WANDER = "WANDER",
+    FOLLOW = "FOLLOW",
+    CHASE = "CHASE",
+    KITE = "KITE",
+    RETREAT = "RETREAT",
+    INACTIVE = "INACTIVE"
+}
+
+SimMovement = SimMovement or {}
+
+function SimMovement:SetState(tbNpc, newState, reason)
+    if not tbNpc then return end
+    local oldState = tbNpc.moveState or SIM_MOVE_STATE.IDLE
+    if oldState ~= newState then
+        tbNpc.moveState = newState
+        tbNpc.moveStateChangeTick = tbNpc.tick_breath or 0
+        tbNpc.moveStateReason = reason
+    end
+    return newState
+end
+
+function SimMovement:GetState(tbNpc)
+    if not tbNpc then return SIM_MOVE_STATE.IDLE end
+    return tbNpc.moveState or SIM_MOVE_STATE.IDLE
+end
+
+function SimMovement:CheckStuck(tbNpc, curTileX, curTileY)
+    if not tbNpc or not curTileX or not curTileY then return 0 end
+    if tbNpc.isFighting == 1 then return 0 end
+    local st = tbNpc.moveState or SIM_MOVE_STATE.IDLE
+    if st == SIM_MOVE_STATE.IDLE or st == SIM_MOVE_STATE.INACTIVE then
+        tbNpc.stuckTicks = 0
+        tbNpc.lastMoveTileX = curTileX
+        tbNpc.lastMoveTileY = curTileY
+        return 0
+    end
+
+    if not tbNpc.lastMoveTileX or not tbNpc.lastMoveTileY then
+        tbNpc.lastMoveTileX = curTileX
+        tbNpc.lastMoveTileY = curTileY
+        tbNpc.stuckTicks = 0
+        return 0
+    end
+
+    local dist = GetDistanceRadius(curTileX, curTileY, tbNpc.lastMoveTileX, tbNpc.lastMoveTileY)
+    if dist <= 1 then
+        tbNpc.stuckTicks = (tbNpc.stuckTicks or 0) + 1
+        if tbNpc.stuckTicks >= 5 then
+            return 1
+        end
+    else
+        tbNpc.stuckTicks = 0
+        tbNpc.lastMoveTileX = curTileX
+        tbNpc.lastMoveTileY = curTileY
+    end
+    return 0
+end
+
+function SimMovement:HandleStuck(simInstance, tbNpc, curTileX, curTileY)
+    if not tbNpc then return 0 end
+    tbNpc.stuckTicks = 0
+    tbNpc.stuckRecoveries = (tbNpc.stuckRecoveries or 0) + 1
+
+    -- Recovery method 1: Dash / jump if BotDashTo available
+    if BotDashTo and tbNpc.finalIndex and tbNpc.finalIndex > 0 and curTileX and curTileY then
+        local offX = random(-5, 5)
+        local offY = random(-5, 5)
+        if offX == 0 and offY == 0 then offX = 3; offY = 3 end
+        local destX = curTileX + offX
+        local destY = curTileY + offY
+        BotDashTo(tbNpc.finalIndex, destX, destY, 15)
+        tbNpc.lastMoveTileX = destX
+        tbNpc.lastMoveTileY = destY
+        return 1
+    end
+
+    -- Recovery method 2: advance random walk point
+    if tbNpc.movementSys and tbNpc.movementSys.GetRandomWalkPoint then
+        tbNpc.nPosId = tbNpc.movementSys:GetRandomWalkPoint(simInstance, tbNpc, tbNpc.nPosId)
+        return 1
+    end
+
+    return 0
+end
+
 SimMovement.KeoXe = {
     IsActive = IsActive,
 
@@ -104,6 +190,11 @@ SimMovement.KeoXe = {
 
         local myPosX = floor(nX32 / 32)
         local myPosY = floor(nY32 / 32)
+
+        local isStuck = SimMovement:CheckStuck(tbNpc, myPosX, myPosY)
+        if isStuck == 1 then
+            SimMovement:HandleStuck(simInstance, tbNpc, myPosX, myPosY)
+        end
 
         local cachNguoiChoi = 0 
 

@@ -1,3 +1,131 @@
+SIM_COMBAT_STATE = {
+    PEACE = "PEACE",
+    AGGRO = "AGGRO",
+    ENGAGING = "ENGAGING",
+    COMBO = "COMBO",
+    COOLDOWN = "COOLDOWN",
+    KITE = "KITE",
+    RETREAT_HEAL = "RETREAT_HEAL"
+}
+
+SimFight = SimFight or {}
+
+function SimFight:SetCombatState(tbNpc, newState, reason)
+    if not tbNpc then return end
+    local oldState = tbNpc.combatState or SIM_COMBAT_STATE.PEACE
+    if oldState ~= newState then
+        tbNpc.combatState = newState
+        tbNpc.combatStateChangeTick = tbNpc.tick_breath or 0
+        tbNpc.combatStateReason = reason
+    end
+    return newState
+end
+
+function SimFight:GetCombatState(tbNpc)
+    if not tbNpc then return SIM_COMBAT_STATE.PEACE end
+    return tbNpc.combatState or SIM_COMBAT_STATE.PEACE
+end
+
+function SimFight:IsRangedFaction(faction, weaponBranch)
+    if not faction then return 0 end
+    local f = faction
+    if string and string.lower then
+        f = string.lower(faction)
+    elseif strlower then
+        f = strlower(faction)
+    end
+    if f == "ngami" then return 1 end
+    if f == "duongmon" then return 1 end
+    if f == "ngudoc" then return 1 end
+    if f == "vodang" and (not weaponBranch or weaponBranch == "khi" or weaponBranch == "phap") then return 1 end
+    if f == "thiennhan" and (weaponBranch == "dao" or weaponBranch == "bua") then return 1 end
+    if f == "conlon" and (weaponBranch == "dao" or weaponBranch == "set" or weaponBranch == "bua") then return 1 end
+    return 0
+end
+
+function SimFight:CalculateKiteTile(myTileX, myTileY, enemyTileX, enemyTileY, kiteDist)
+    kiteDist = kiteDist or 6
+    local dx = myTileX - enemyTileX
+    local dy = myTileY - enemyTileY
+    local dist = sqrt(dx*dx + dy*dy)
+    if dist < 1 then
+        dx = 1
+        dy = 0
+        dist = 1
+    end
+    local destX = myTileX + floor(dx * kiteDist / dist)
+    local destY = myTileY + floor(dy * kiteDist / dist)
+    return destX, destY
+end
+
+function SimFight:SelectBestTarget(simInstance, tbNpc, fightSys)
+    if not tbNpc or not tbNpc.finalIndex or tbNpc.finalIndex <= 0 then return nil end
+    local myX32, myY32, myW = GetNpcPos(tbNpc.finalIndex)
+    if not myX32 then return nil end
+    local myTileX = floor(myX32 / 32)
+    local myTileY = floor(myY32 / 32)
+
+    -- 1. Check direct player enemy (e.g. duel / self defense / aggro)
+    local foundPlayerEnemy = tbNpc.isPlayerEnemyAround
+    if foundPlayerEnemy and foundPlayerEnemy > 0 then
+        local pW, pTileX, pTileY = CallPlayerFunction(foundPlayerEnemy, GetWorldPos)
+        if pW and pTileX and pTileY and pW == myW then
+            local dist = GetDistanceRadius(myTileX, myTileY, pTileX, pTileY)
+            local pNpcIdx = PIdx2NpcIdx and PIdx2NpcIdx(foundPlayerEnemy)
+            local curLife = (pNpcIdx and NPCINFO_GetNpcCurrentLife and NPCINFO_GetNpcCurrentLife(pNpcIdx)) or 1000
+            local maxLife = (pNpcIdx and NPCINFO_GetNpcCurrentMaxLife and NPCINFO_GetNpcCurrentMaxLife(pNpcIdx)) or 1000
+            return {
+                targetType = "player",
+                targetId = foundPlayerEnemy,
+                npcIndex = pNpcIdx,
+                tileX = pTileX,
+                tileY = pTileY,
+                worldX = pTileX * 32,
+                worldY = pTileY * 32,
+                dist = dist,
+                curLife = curLife,
+                maxLife = maxLife
+            }
+        else
+            tbNpc.isPlayerEnemyAround = 0
+        end
+    end
+
+    -- 2. Check NPC enemies around (support direct fightSys passed or tbNpc.foundNpcEnemy)
+    local foundNpcEnemy = tbNpc.foundNpcEnemy
+    if not foundNpcEnemy or foundNpcEnemy <= 0 then
+        local isNpcAround = (fightSys and fightSys.IsNpcEnemyAround) or (self and self.IsNpcEnemyAround) or (tbNpc.fightSys and tbNpc.fightSys.IsNpcEnemyAround) or (SimFight and SimFight.Citizen and SimFight.Citizen.IsNpcEnemyAround)
+        if isNpcAround then
+            foundNpcEnemy = isNpcAround(fightSys or self or tbNpc.fightSys or SimFight.Citizen, simInstance, tbNpc)
+        end
+    end
+
+    if foundNpcEnemy and foundNpcEnemy > 0 then
+        local targetX32, targetY32, targetW = GetNpcPos(foundNpcEnemy)
+        if targetX32 and targetY32 and targetW == myW then
+            local targetTileX = floor(targetX32 / 32)
+            local targetTileY = floor(targetY32 / 32)
+            local dist = GetDistanceRadius(myTileX, myTileY, targetTileX, targetTileY)
+            local curLife = (NPCINFO_GetNpcCurrentLife and NPCINFO_GetNpcCurrentLife(foundNpcEnemy)) or 1000
+            local maxLife = (NPCINFO_GetNpcCurrentMaxLife and NPCINFO_GetNpcCurrentMaxLife(foundNpcEnemy)) or 1000
+            return {
+                targetType = "npc",
+                targetId = foundNpcEnemy,
+                npcIndex = foundNpcEnemy,
+                tileX = targetTileX,
+                tileY = targetTileY,
+                worldX = targetX32,
+                worldY = targetY32,
+                dist = dist,
+                curLife = curLife,
+                maxLife = maxLife
+            }
+        end
+    end
+
+    return nil
+end
+
 --========================================================
 -- HORSE COMBAT & DISMOUNT ENGINE
 --========================================================
@@ -106,6 +234,24 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         return
     end
 
+    -- Check low HP retreat / heal
+    if NPCINFO_GetNpcCurrentLife and NPCINFO_GetNpcCurrentMaxLife then
+        local cl = NPCINFO_GetNpcCurrentLife(tbNpc.finalIndex)
+        local ml = NPCINFO_GetNpcCurrentMaxLife(tbNpc.finalIndex)
+        if cl and ml and ml > 0 and (cl / ml) < 0.25 and tbNpc.tongkim ~= 1 then
+            SimFight:SetCombatState(tbNpc, SIM_COMBAT_STATE.RETREAT_HEAL, "low hp panic")
+            if EnforceBotHp then EnforceBotHp(tbNpc.finalIndex, 350) end
+            tbNpc.tick_canCast = tbNpc.tick_breath + 2
+            return
+        end
+    end
+
+    local target = SimFight:SelectBestTarget(simInstance, tbNpc, self)
+    if not target then
+        SimFight:SetCombatState(tbNpc, SIM_COMBAT_STATE.PEACE, "no enemies")
+        return
+    end
+
     local selectedSkill = SimPickSkill(tbNpc)
     if not selectedSkill or not selectedSkill[1] then return end
     local skillId = selectedSkill[1]
@@ -113,75 +259,72 @@ function execCastNormalSkill(self, simInstance, tbNpc)
     local bonusSkillLv = (SimGear and SimGear.GetSkillLevelBonus and SimGear:GetSkillLevelBonus(tbNpc)) or 0
     local skillLevel = baseSkillLv + bonusSkillLv
 
-    -- 1. Lay toa do o vuong (tile coords) cua Bot
+    -- Get tile coords of Bot
     local myX32, myY32, myW = GetNpcPos(tbNpc.finalIndex)
     if not myX32 then return end
     local myTileX = floor(myX32 / 32)
     local myTileY = floor(myY32 / 32)
 
-    -- 2. Tinh toan tam danh toi da (AttackRadius) theo don vi o vuong (tiles)
     local maxCastTiles = 2
     if SimProgression and SimProgression.GetSkillAttackRadiusTiles then
         maxCastTiles = SimProgression:GetSkillAttackRadiusTiles(skillId)
     end
-
     local maxChaseTiles = SIMBOT_CHASE_MAX_TILES or 20
-    local foundPlayerEnemy = tbNpc.isPlayerEnemyAround
-    if foundPlayerEnemy and foundPlayerEnemy > 0 then
-        local targetW, targetTileX, targetTileY = CallPlayerFunction(foundPlayerEnemy, GetWorldPos)
-        if targetW and targetTileX and targetTileY and targetW == myW then
-            local dist = GetDistanceRadius(myTileX, myTileY, targetTileX, targetTileY)
-            if dist > maxChaseTiles then
-                tbNpc.isPlayerEnemyAround = 0
-            elseif dist > maxCastTiles then
-                if NpcRun then NpcRun(tbNpc.finalIndex, targetTileX, targetTileY) end
-                tbNpc.tick_canCast = tbNpc.tick_breath + 1
-                return
-            else
-                SimApplyHorseCombat(tbNpc, skillId)
-                if BotDoSkill and PIdx2NpcIdx then
-                    local _r = BotDoSkill(tbNpc.finalIndex, skillId, skillLevel, PIdx2NpcIdx(foundPlayerEnemy))
-                else
-                    NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, targetTileX*32, targetTileY*32)
-                end
-                local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
-                tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
-                if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, foundNpcEnemy, "npc") end
-                if SimProgression and SimProgression.AddExp and tbNpc.mode == "train" then
-                    SimProgression:AddExp(tbNpc, (tbNpc.level or 1) * 20)
-                end
-                return
-            end
-        else
+
+    if target.dist > maxChaseTiles then
+        if target.targetType == "player" then
             tbNpc.isPlayerEnemyAround = 0
+        else
+            tbNpc.foundNpcEnemy = nil
         end
+        SimFight:SetCombatState(tbNpc, SIM_COMBAT_STATE.PEACE, "target out of chase range")
+        return
     end
 
-    local foundNpcEnemy = self:IsNpcEnemyAround(simInstance, tbNpc)
-    if foundNpcEnemy and foundNpcEnemy > 0 then
-        local targetX32, targetY32, targetW = GetNpcPos(foundNpcEnemy)
-        if targetX32 and targetY32 and targetW == myW then
-            local targetTileX = floor(targetX32 / 32)
-            local targetTileY = floor(targetY32 / 32)
-            local dist = GetDistanceRadius(myTileX, myTileY, targetTileX, targetTileY)
+    local isRanged = SimFight:IsRangedFaction(tbNpc.faction, tbNpc.weaponBranch)
 
-            if dist > maxChaseTiles then
-                tbNpc.foundNpcEnemy = nil
-            elseif dist > maxCastTiles then
-                if NpcRun then NpcRun(tbNpc.finalIndex, targetTileX, targetTileY) end
-                tbNpc.tick_canCast = tbNpc.tick_breath + 1
-                return
-            else
-                SimApplyHorseCombat(tbNpc, skillId)
-                NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, targetX32, targetY32)
-                local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
-                tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
-                if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, foundNpcEnemy, "npc") end
-                if SimProgression and SimProgression.AddExp and tbNpc.mode == "train" then
-                    SimProgression:AddExp(tbNpc, (tbNpc.level or 1) * 20)
-                end
-                return
-            end
+    -- Tactical kiting: If ranged bot and target is closer than 4 tiles
+    if isRanged == 1 and target.dist < 4 and tbNpc.tongkim ~= 1 then
+        SimFight:SetCombatState(tbNpc, SIM_COMBAT_STATE.KITE, "ranged spacing kite")
+        local kiteX, kiteY = SimFight:CalculateKiteTile(myTileX, myTileY, target.tileX, target.tileY, 6)
+        if NpcRun then NpcRun(tbNpc.finalIndex, kiteX, kiteY) end
+        if BotDashTo and random(1, 3) == 1 then
+            BotDashTo(tbNpc.finalIndex, kiteX, kiteY, 15)
+        end
+        if SimMovement then SimMovement:SetState(tbNpc, SIM_MOVE_STATE.KITE, "tactical kite") end
+        tbNpc.tick_canCast = tbNpc.tick_breath + 1
+        return
+    elseif target.dist > maxCastTiles then
+        SimFight:SetCombatState(tbNpc, SIM_COMBAT_STATE.ENGAGING, "closing distance")
+        if NpcRun then NpcRun(tbNpc.finalIndex, target.tileX, target.tileY) end
+        if SimMovement then SimMovement:SetState(tbNpc, SIM_MOVE_STATE.CHASE, "chasing enemy") end
+        tbNpc.tick_canCast = tbNpc.tick_breath + 1
+        return
+    end
+
+    -- Cast skill combo
+    SimFight:SetCombatState(tbNpc, SIM_COMBAT_STATE.COMBO, "casting combo")
+    SimApplyHorseCombat(tbNpc, skillId)
+
+    if target.targetType == "player" then
+        if BotDoSkill and target.npcIndex and target.npcIndex > 0 then
+            local _r = BotDoSkill(tbNpc.finalIndex, skillId, skillLevel, target.npcIndex)
+        else
+            NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, target.worldX, target.worldY)
+        end
+        local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
+        tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
+        if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, target.targetId, "player") end
+        if SimProgression and SimProgression.AddExp and tbNpc.mode == "train" then
+            SimProgression:AddExp(tbNpc, (tbNpc.level or 1) * 20)
+        end
+    else
+        NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, target.worldX, target.worldY)
+        local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
+        tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
+        if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, target.targetId, "npc") end
+        if SimProgression and SimProgression.AddExp and tbNpc.mode == "train" then
+            SimProgression:AddExp(tbNpc, (tbNpc.level or 1) * 20)
         end
     end
 end
@@ -334,7 +477,7 @@ end
 /*
     Public functions
 */
-SimFight = {}
+SimFight = SimFight or {}
 
 SimFight.Base = {
 }
