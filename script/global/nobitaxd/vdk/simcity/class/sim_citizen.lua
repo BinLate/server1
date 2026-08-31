@@ -42,7 +42,7 @@ function SimCitizen:New(fighter)
         processGroup = processGroup -- Alternate between group 1 and 2
     }
 
-    for k, v in pairs(fighter) do
+    for k, v in fighter do
         tbNpc[k] = v
     end
 

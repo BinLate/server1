@@ -385,7 +385,7 @@ function SimProgression:UpdateBotSkills(tbNpc)
 
     if not branch or not facTable[branch] then
         local firstBranch = nil
-        for bName, _ in pairs(facTable) do
+        for bName, _ in facTable do
             firstBranch = bName
             break
         end

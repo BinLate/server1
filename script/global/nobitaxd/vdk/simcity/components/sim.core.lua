@@ -1059,12 +1059,12 @@ end
 
 function SimCore:ATick(rate)       
     if self.totalFighters <= 2000 then
-        for _, fighter in pairs(self.fighterList) do
+        for _, fighter in self.fighterList do
             self:OnTimer(fighter, rate)
         end
         return
     end 
-    for _, fighter in pairs(self.fighterList) do
+    for _, fighter in self.fighterList do
         if fighter.processGroup == self.currentProcessGroup then
             self:OnTimer(fighter, rate)
         end

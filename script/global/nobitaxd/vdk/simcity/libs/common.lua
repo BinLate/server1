@@ -1,4 +1,16 @@
 IncludeLib("NPCINFO")
+
+-- Polyfill for pairs in Kingsoft Lua 5.0 environments
+if not pairs then
+    pairs = function(t)
+        if type(t) == "table" then
+            return next, t, nil
+        else
+            return t
+        end
+    end
+end
+
 if not GetNpcAroundNpcList then
     function GetNpcAroundNpcList(nNpcIndex, nRadius)
         return {}, 0
@@ -92,7 +104,7 @@ end
 function objCopy(obj)
     local output = {}
     if obj then
-        for k, v in pairs(obj) do
+        for k, v in obj do
             output[k] = v
         end
     end
@@ -214,7 +226,7 @@ end
 
 function getObjectKeys(tbl)
     local result = {}
-    for k,v in pairs(tbl) do
+    for k,v in tbl do
         tinsert(result, k)
     end
     return result
@@ -229,7 +241,7 @@ function getClosestNode(nodes, nX, nY)
     local minDist1 = 200
     local closestNode1 = nil
 
-    for nodeName, coords in pairs(nodes) do
+    for nodeName, coords in nodes do
         local dist = GetDistanceRadius(nX, nY, coords[1], coords[2])
         if dist < minDist1 then
             minDist1 = dist
