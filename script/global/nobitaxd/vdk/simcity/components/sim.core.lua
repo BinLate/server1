@@ -1040,12 +1040,18 @@ function SimCore:OnTimer(tbNpc, rate)
         tbNpc.fightSys:Update(self, tbNpc)
     end
 
-    -- Virtual Party lifecycle tick: executed once per party by Leader
-    if tbNpc.virtualPartyId and SimParty and SimParty.parties then
-        local p = SimParty.parties[tbNpc.virtualPartyId]
-        if p and p.leaderId == tbNpc.id then
-            SimParty:UpdatePartyMovement(self, p.id)
-            SimParty:OnPartyTick(self, p.id)
+    -- Virtual Party lifecycle tick: executed once per party by Leader, or auto-form party for unpartied bots
+    if SimParty then
+        if tbNpc.virtualPartyId and SimParty.parties then
+            local p = SimParty.parties[tbNpc.virtualPartyId]
+            if p and p.leaderId == tbNpc.id then
+                SimParty:UpdatePartyMovement(self, p.id)
+                SimParty:OnPartyTick(self, p.id)
+            end
+        elseif (not tbNpc.virtualPartyId) and tbNpc.isDead == 0 and tbNpc.isFighting == 0 
+           and (not tbNpc.tongkim or tbNpc.tongkim ~= 1) and (not tbNpc.duelPlayerId) and (not tbNpc.partyPlayerId)
+           and mod(tbNpc.tick_breath, 10*18/REFRESH_RATE) == 0 and SimParty.AutoFormParty then
+            SimParty:AutoFormParty(self, tbNpc)
         end
     end
 

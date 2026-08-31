@@ -610,6 +610,151 @@ class TestPhaseDSocialParty(unittest.TestCase):
         self.assertTrue(m2_fight)
         self.assertTrue(m2_aggro)
 
+    def test_sim_citizen_live_update_auto_forms_party(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        SimParty.parties = {}
+        SimParty.nextPartyId = 1
+
+        local simCitizen = objCopy(SimCore)
+        simCitizen.fighterList = {}
+        simCitizen.removedIds = {}
+        simCitizen.totalFighters = 4
+        simCitizen.currentProcessGroup = 1
+
+        -- 2 unpartied bots on Map 53, Camp 1
+        local bot1 = {
+            id = 1,
+            finalIndex = 1001,
+            nMapId = 53,
+            camp = 1,
+            isDead = 0,
+            isFighting = 0,
+            tick_breath = 9,
+            processGroup = 1,
+            movementSys = { Move = function() end, IsActive = function() return 1 end },
+            fightSys = { Update = function() end },
+            funSys = { Update = function() end },
+            entitySys = { Update = function() end }
+        }
+
+        local bot2 = {
+            id = 2,
+            finalIndex = 1002,
+            nMapId = 53,
+            camp = 1,
+            isDead = 0,
+            isFighting = 0,
+            tick_breath = 9,
+            processGroup = 1,
+            movementSys = { Move = function() end, IsActive = function() return 1 end },
+            fightSys = { Update = function() end },
+            funSys = { Update = function() end },
+            entitySys = { Update = function() end }
+        }
+
+        -- Bot 3 on different map (Map 70)
+        local bot3 = {
+            id = 3,
+            finalIndex = 1003,
+            nMapId = 70,
+            camp = 1,
+            isDead = 0,
+            isFighting = 0,
+            tick_breath = 9,
+            processGroup = 1,
+            movementSys = { Move = function() end, IsActive = function() return 1 end },
+            fightSys = { Update = function() end },
+            funSys = { Update = function() end },
+            entitySys = { Update = function() end }
+        }
+
+        -- Bot 4 on same map but different camp (Camp 2)
+        local bot4 = {
+            id = 4,
+            finalIndex = 1004,
+            nMapId = 53,
+            camp = 2,
+            isDead = 0,
+            isFighting = 0,
+            tick_breath = 9,
+            processGroup = 1,
+            movementSys = { Move = function() end, IsActive = function() return 1 end },
+            fightSys = { Update = function() end },
+            funSys = { Update = function() end },
+            entitySys = { Update = function() end }
+        }
+
+        simCitizen.fighterList[1] = bot1
+        simCitizen.fighterList[2] = bot2
+        simCitizen.fighterList[3] = bot3
+        simCitizen.fighterList[4] = bot4
+
+        -- Execute production tick without manually creating any parties
+        simCitizen:ATick(1)
+
+        local b1Party = bot1.virtualPartyId
+        local b2Party = bot2.virtualPartyId
+        local b3Party = bot3.virtualPartyId
+        local b4Party = bot4.virtualPartyId
+
+        local sameParty = (b1Party ~= nil and b1Party == b2Party)
+        local diffMapIsolated = (b3Party ~= b1Party)
+        local diffCampIsolated = (b4Party ~= b1Party)
+
+        local p1 = SimParty:GetParty(b1Party)
+        local p1MemCount = p1 and getn(p1.members) or 0
+
+        -- Now fill party 1 to 8 members and verify 9th bot creates its own party
+        for i = 5, 10 do
+            local extraBot = {
+                id = i,
+                finalIndex = 1000 + i,
+                nMapId = 53,
+                camp = 1,
+                isDead = 0,
+                isFighting = 0,
+                tick_breath = 9,
+                processGroup = 1,
+                movementSys = { Move = function() end, IsActive = function() return 1 end },
+                fightSys = { Update = function() end },
+                funSys = { Update = function() end },
+                entitySys = { Update = function() end }
+            }
+            simCitizen.fighterList[i] = extraBot
+            simCitizen:OnTimer(extraBot, 1)
+        end
+
+        local p1CountAtMax = getn(p1.members)
+        local bot11 = {
+            id = 11,
+            finalIndex = 1011,
+            nMapId = 53,
+            camp = 1,
+            isDead = 0,
+            isFighting = 0,
+            tick_breath = 9,
+            processGroup = 1,
+            movementSys = { Move = function() end, IsActive = function() return 1 end },
+            fightSys = { Update = function() end },
+            funSys = { Update = function() end },
+            entitySys = { Update = function() end }
+        }
+        simCitizen.fighterList[11] = bot11
+        simCitizen:OnTimer(bot11, 1)
+
+        local bot11NewParty = (bot11.virtualPartyId ~= nil and bot11.virtualPartyId ~= b1Party)
+
+        return sameParty, diffMapIsolated, diffCampIsolated, p1MemCount == 2, p1CountAtMax == 8, bot11NewParty
+        """)
+        same_p, diff_map, diff_camp, mem2_ok, max8_ok, b11_new = res
+        self.assertTrue(same_p)
+        self.assertTrue(diff_map)
+        self.assertTrue(diff_camp)
+        self.assertTrue(mem2_ok)
+        self.assertTrue(max8_ok)
+        self.assertTrue(b11_new)
+
     def test_phase_d_core_initialization_defaults(self):
         self.init_simcity_environment()
         res = self.lua.execute("""
