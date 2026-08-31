@@ -182,6 +182,11 @@ function SimCore:initCharConfig(config)
         config.combatState = SIM_COMBAT_STATE.PEACE
     end
     config.stuckTicks = 0
+    config.personality = config.personality or "friendly"
+    config.lastChatTick = 0
+    config.lastWorldChatTick = 0
+    config.virtualPartyId = config.virtualPartyId or nil
+    config.isSitting = 0
 
 
 end
