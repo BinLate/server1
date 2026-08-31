@@ -4,7 +4,7 @@
 
 ### Fixed
 - **Lỗi Đồ Sát (Camp 5):** Sửa hàm `IsAttackableCamp` trong `libs/common.lua` để 2 người cùng bật Đồ Sát (5 vs 5) đánh được nhau thay vì bị tính là đồng minh.
-- **Lỗi Lag & Đứng Im Tống Kim:** Giảm số lượng bot từ hơn 672 con xuống đúng 20 bot mỗi phe (40 bot tổng cộng: 1 Soái, 2 Đại Tướng, 3 Phó Tướng, 4 Hiệu Úy, 10 Binh Sĩ) trong `plugins/pchientranh.lua`.
+- **Giới hạn an toàn Tống Kim (5 Tống / 5 Kim = 10 Bot):** Cố định cấu hình tập trung `TONGKIM_SIMBOT_PER_CAMP = 5` và `TONGKIM_SIMBOT_TOTAL = 10` trong `config.lua`, đồng bộ điều tiết trong `simtk.lua` và chuyển hướng toàn bộ các hàm spawn cũ trong `pchientranh.lua` để đảm bảo không vượt quá ngân sách CPU.
 - **Lỗi Máu Yếu / 1-Shot:** Gán đúng Level 95+ và gọi `SimGear:ApplyGearStats` cho toàn bộ bot trong `group_fighter.class.lua` và `sim.entity.lua` giúp bot có đúng 6,000 – 12,000+ HP và phòng thủ chuẩn.
 - **Lỗi Encoding:** Chuẩn hóa toàn bộ 45 file Lua trong `simcity` về bảng mã `Windows-1258` thuần túy.
 

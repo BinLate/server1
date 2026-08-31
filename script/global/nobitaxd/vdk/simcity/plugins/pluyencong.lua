@@ -67,6 +67,30 @@ function SimCityLuyenCong:GetPlayerCountInMap(nMapId)
     return nPlayers
 end
 
+function SimCityLuyenCong:countBotsInMap(mapId)
+    local counter = 0
+    if SimCitizen and SimCitizen.fighterList then
+        for k, v in SimCitizen.fighterList do
+            if v.nMapId and v.nMapId == mapId and v.mode == "train" and (v.isDead ~= 1) then
+                counter = counter + 1
+            end
+        end
+    end
+    return counter
+end
+
+function SimCityLuyenCong:countGlobalTrainBots()
+    local counter = 0
+    if SimCitizen and SimCitizen.fighterList then
+        for k, v in SimCitizen.fighterList do
+            if v.mode == "train" and (v.isDead ~= 1) then
+                counter = counter + 1
+            end
+        end
+    end
+    return counter
+end
+
 function SimCityLuyenCong:spawnForMap(mapIdx)
     local m = self.TRAIN_MAPS[mapIdx]
     if not m then return end
@@ -77,8 +101,28 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
     worldInfo.allowFighting = 1
     worldInfo.showFightingArea = 0
 
-    local spawnedCount = 0
+    local maxPerMap = TRAIN_BOT_MAX_PER_MAP or 25
+    local globalBudget = TRAIN_BOT_GLOBAL_BUDGET or 200
     local targetCount = m.count or 20
+    if targetCount > maxPerMap then targetCount = maxPerMap end
+
+    local curBots = self:countBotsInMap(m.mapId)
+    if curBots >= targetCount then
+        if not self.mapState[m.mapId] then self.mapState[m.mapId] = {} end
+        self.mapState[m.mapId].isSpawned = 1
+        self.mapState[m.mapId].botCount = curBots
+        self.mapState[m.mapId].lastPlayerSeen = (GetGameTime and GetGameTime()) or 0
+        return
+    end
+
+    local needed = targetCount - curBots
+    local globalActive = self:countGlobalTrainBots()
+    if (globalActive + needed) > globalBudget then
+        needed = globalBudget - globalActive
+    end
+    if needed <= 0 then return end
+
+    local spawnedCount = 0
 
     -- Lay pool NPC phu hop theo cap map
     local cap = 1
@@ -92,7 +136,7 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
         pool = { 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110 }
     end
 
-    for i = 1, targetCount do
+    for i = 1, needed do
         local id = pool[random(1, getn(pool))]
         local lv = random(m.minLv, m.maxLv)
 
@@ -136,7 +180,7 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
         self.mapState[m.mapId] = {}
     end
     self.mapState[m.mapId].isSpawned = 1
-    self.mapState[m.mapId].botCount = spawnedCount
+    self.mapState[m.mapId].botCount = curBots + spawnedCount
     self.mapState[m.mapId].lastPlayerSeen = (GetGameTime and GetGameTime()) or 0
 end
 
@@ -152,7 +196,9 @@ end
 
 function SimCityLuyenCong:ATick()
     local curTime = (GetGameTime and GetGameTime()) or 0
-    if (curTime - self.lastScanTime) < self.scanInterval then
+    local interval = AOI_SCAN_INTERVAL or self.scanInterval or 15
+    local timeout = AOI_HIBERNATE_TIMEOUT or self.hibernateTimeout or 120
+    if (curTime - self.lastScanTime) < interval then
         return
     end
     self.lastScanTime = curTime
@@ -169,13 +215,11 @@ function SimCityLuyenCong:ATick()
 
         if pCount > 0 then
             state.lastPlayerSeen = curTime
-            if state.isSpawned == 0 then
-                self:spawnForMap(i)
-            end
+            self:spawnForMap(i)
         else
             if state.isSpawned == 1 then
                 local idleTime = curTime - state.lastPlayerSeen
-                if idleTime >= self.hibernateTimeout then
+                if idleTime >= timeout then
                     self:hibernateMap(mapId)
                 end
             end
