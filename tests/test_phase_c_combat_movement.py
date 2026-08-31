@@ -595,5 +595,81 @@ class TestPhaseCCombatMovement(unittest.TestCase):
         self.assertEqual(dashes, 0)
         self.assertEqual(stuckTicks, 0)
 
+    def test_combat_chase_with_tick_can_cast_cooling_triggers_stuck_recovery(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local dashCalled = 0
+        BotDashTo = function(idx, x, y, speed) dashCalled = dashCalled + 1 end
+
+        local tbNpc = {
+            finalIndex = 1001,
+            moveState = SIM_MOVE_STATE.CHASE,
+            combatState = SIM_COMBAT_STATE.ENGAGING,
+            isFighting = 1,
+            tick_breath = 100,
+            tick_canCast = 101, -- throttling/cooling active during chase
+            stuckTicks = 0,
+            stuckRecoveries = 0
+        }
+
+        local s0 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s1 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s2 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s3 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s4 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s5 = SimMovement:CheckStuck(tbNpc, 100, 100)
+
+        local recovered = 0
+        if s5 == 1 then
+            recovered = SimMovement:HandleStuck(nil, tbNpc, 100, 100)
+        end
+
+        return s5 == 1, recovered == 1, dashCalled, tbNpc.stuckTicks, tbNpc.stuckRecoveries
+        """)
+        s5_stuck, rec_ok, dashes, tAfter, cntAfter = res
+        self.assertTrue(s5_stuck)
+        self.assertTrue(rec_ok)
+        self.assertGreater(dashes, 0)
+        self.assertEqual(tAfter, 0)
+        self.assertEqual(cntAfter, 1)
+
+    def test_combat_kite_with_tick_can_cast_cooling_triggers_stuck_recovery(self):
+        self.init_simcity_environment()
+        res = self.lua.execute("""
+        local dashCalled = 0
+        BotDashTo = function(idx, x, y, speed) dashCalled = dashCalled + 1 end
+
+        local tbNpc = {
+            finalIndex = 1001,
+            moveState = SIM_MOVE_STATE.KITE,
+            combatState = SIM_COMBAT_STATE.KITE,
+            isFighting = 1,
+            tick_breath = 100,
+            tick_canCast = 101, -- throttling/cooling active during kite
+            stuckTicks = 0,
+            stuckRecoveries = 0
+        }
+
+        local s0 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s1 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s2 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s3 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s4 = SimMovement:CheckStuck(tbNpc, 100, 100)
+        local s5 = SimMovement:CheckStuck(tbNpc, 100, 100)
+
+        local recovered = 0
+        if s5 == 1 then
+            recovered = SimMovement:HandleStuck(nil, tbNpc, 100, 100)
+        end
+
+        return s5 == 1, recovered == 1, dashCalled, tbNpc.stuckTicks, tbNpc.stuckRecoveries
+        """)
+        s5_stuck, rec_ok, dashes, tAfter, cntAfter = res
+        self.assertTrue(s5_stuck)
+        self.assertTrue(rec_ok)
+        self.assertGreater(dashes, 0)
+        self.assertEqual(tAfter, 0)
+        self.assertEqual(cntAfter, 1)
+
 if __name__ == '__main__':
     unittest.main()
