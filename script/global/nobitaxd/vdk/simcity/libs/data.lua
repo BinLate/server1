@@ -14,7 +14,7 @@ SimCityPhai = {
 -- Doc ten
 function loadNames()
     local namesData = SimCityTableFromFile(settingsPath.. "names.txt", {"*w"})
-    if namesData then
+    if namesData and getn(namesData) > 0 then
         for i=1, getn(namesData) do
             local _n = namesData[i][1]
             if _n and _n ~= "" and _n ~= "Name" then

@@ -177,8 +177,10 @@ function SimCityWorld:ShowTrangTri(nW, show)
 	end
 end
 function SimCityWorld:initThanhThi()
-	for worldId, worldInfo in SimCityMap do
-		self:New(worldInfo)
+	if SimCityMap and next(SimCityMap, nil) then
+		for worldId, worldInfo in SimCityMap do
+			self:New(worldInfo)
+		end
 	end
 end
 

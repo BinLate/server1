@@ -612,12 +612,12 @@ function SimProgression:SanitizeName(szName)
 end
 
 -- 10.6. PERSISTENCE: LUU VA DOC ROSTER SIMBOT LUYEN CONG (ATOMIC SAVE)
-local function _sim_open(path, mode)
+function _sim_open(path, mode)
     if openfile then return openfile(path, mode) end
     if io and io.open then return io.open(path, mode) end
     return nil
 end
-local function _sim_flush(f)
+function _sim_flush(f)
     if not f then return 0 end
     if flushfile then
         local ok, res, err = pcall(flushfile, f)
@@ -635,7 +635,7 @@ local function _sim_flush(f)
     end
     return 1
 end
-local function _sim_close(f)
+function _sim_close(f)
     if not f then return 0 end
     if closefile then
         local ok, res, err = pcall(closefile, f)
@@ -653,13 +653,13 @@ local function _sim_close(f)
     end
     return 0
 end
-local function _sim_read(f, mode)
+function _sim_read(f, mode)
     if not f then return nil end
     if read then return read(f, mode) end
     if f.read then return f:read(mode) end
     return nil
 end
-local function _sim_write(f, str)
+function _sim_write(f, str)
     if not f or not str then return 0 end
     if write then
         local ok, res, err = pcall(write, f, str)
@@ -680,7 +680,7 @@ end
 -- Helper function for atomic file rename
 -- On Linux / POSIX game server (GLIBC), rename(2) is guaranteed atomic and replaces existing destination files
 -- on the same filesystem without requiring pre-deletion. renamefile in JX1 C-engine maps directly to this syscall.
-local function _sim_rename(oldp, newp)
+function _sim_rename(oldp, newp)
     if renamefile then
         local ok, res, err = pcall(renamefile, oldp, newp)
         if not ok then return 0 end

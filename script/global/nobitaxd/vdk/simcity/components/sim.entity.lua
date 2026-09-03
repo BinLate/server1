@@ -1,6 +1,4 @@
-/*
-    Public functions
-*/
+-- Public functions
 
 function execCreateChar(self, simInstance, tbNpc, isNew, goX32, goY32)
     local nListId = tbNpc.id

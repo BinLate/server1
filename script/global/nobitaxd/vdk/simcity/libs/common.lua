@@ -190,10 +190,70 @@ function arrRandomExtracItems(arr, n)
 end
 
 
+-- [SimBot fix] Pure-Lua fallback reader (engine iolib). Used when the
+-- TabFile C API is unavailable, so simbot data loading can never hard-fail.
+function SimCityPathToNative(szPath)
+	local out = szPath
+	local i = strfind(out, "\\")
+	while i do
+		out = strsub(out, 1, i - 1) .. "/" .. strsub(out, i + 1)
+		i = strfind(out, "\\")
+	end
+	if strsub(out, 1, 1) == "/" then
+		out = strsub(out, 2)
+	end
+	return out
+end
+
+function SimCityTableFromFileFallback(strFilePatch, tbPattern)
+	if not openfile or not read or not closefile then
+		return {}
+	end
+	local f = openfile(SimCityPathToNative(strFilePatch), "r")
+	if not f then
+		print("SimCityTableFromFile: cannot open "..tostring(strFilePatch))
+		return {}
+	end
+	local tbResult = {}
+	local nRow = 0
+	local szLine = read(f, "*l")
+	while szLine do
+		nRow = nRow + 1
+		if nRow > 1 then
+			local tbCells = split(szLine, "\t")
+			local tbRow = {}
+			for j = 1, getn(tbPattern) do
+				local szCell = tbCells[j]
+				if tbPattern[j] == "*n" then
+					if szCell == nil or szCell == "" then
+						tinsert(tbRow, 0)
+					else
+						tinsert(tbRow, tonumber(szCell) or 0)
+					end
+				else
+					if szCell == nil then
+						tinsert(tbRow, "")
+					else
+						tinsert(tbRow, szCell)
+					end
+				end
+			end
+			tinsert(tbResult, tbRow)
+		end
+		szLine = read(f, "*l")
+	end
+	closefile(f)
+	return tbResult
+end
+
+
 function SimCityTableFromFile(strFilePatch, tbPattern)	
-	if (TabFile_Load(strFilePatch, strFilePatch) == 0) then
+	if not TabFile_Load then
+		IncludeLib("FILESYS")
+	end
+	if (not TabFile_Load or TabFile_Load(strFilePatch, strFilePatch) == 0) then
 		print("Load TabFile Error!"..strFilePatch)
-		return nil
+		return SimCityTableFromFileFallback(strFilePatch, tbPattern)
 	else
 		local tbResult = {}
 		local nRowCount = TabFile_GetRowCount(strFilePatch)
@@ -226,8 +286,10 @@ end
 
 function getObjectKeys(tbl)
     local result = {}
-    for k,v in tbl do
-        tinsert(result, k)
+    if tbl and next(tbl, nil) then
+        for k,v in tbl do
+            tinsert(result, k)
+        end
     end
     return result
 end

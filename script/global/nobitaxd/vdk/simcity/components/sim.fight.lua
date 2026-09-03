@@ -480,9 +480,7 @@ function BuffChar(self, simInstance, tbNpc)
         BotDoSkill(tbNpc.finalIndex, 178, 20, 0)
     end
 end
-/*
-    Public functions
-*/
+-- Public functions
 SimFight = SimFight or {}
 
 SimFight.Base = {
