@@ -64,13 +64,13 @@ function GetTabFileData(path, tab_name, start_row, max_col) -- Doc file txt
     return tbData, nCount - start_row + 1
 end
 
-isChinese = { "<", ">", "", "", "newboss", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
-    "", "", "" }
+isChinese = { "<", ">", "ï¿½ï¿½", "ï¿½", "newboss", "ï¿½", "ï¿½", "ï¿½ï¿½", "ï¿½ï¿½", "ï¿½ï¿½", "ï¿½ï¿½", "ï¿½ï¿½", "ï¿½ï¿½", "ï¿½", "ï¿½", "ï¿½", "ï¿½", "ï¿½", "ï¿½ï¿½",
+    "ï¿½", "ï¿½ï¿½", "ï¿½ï¿½" }
 function fixName(inp)
     local found = false
     for i = 1, getn(isChinese) do
         if strfind(inp, isChinese[i]) ~= nil then
-            return "Qui khch"
+            return "Quï¿½i khï¿½ch"
         end
     end
     return inp
@@ -164,6 +164,51 @@ function IsAttackableCamp(camp1, camp2)
         return 1
     end
     return 0
+end
+
+-- Engine camp colors (npcthunghiem.lua): 1=Chinh/vang, 3=Trung lap/xanh, 2=Ta/tim, 0=trang, 5=Do Sat
+-- NOT by Ngu Hanh / series. No Bang -> faction alignment only.
+function GetFactionCamp(faction)
+    if faction == "thieulam" or faction == "ngami" or faction == "caibang" or faction == "vodang" then
+        return 1
+    end
+    if faction == "thienvuong" or faction == "duongmon" or faction == "thuyyen" or faction == "conlon" then
+        return 3
+    end
+    if faction == "ngudoc" or faction == "thiennhan" then
+        return 2
+    end
+    return 1
+end
+
+-- Apply camp for non-TongKim SimBots. Tong Kim keeps battlefield camp until leave.
+function ApplySimBotFactionCamp(config)
+    if not config then return end
+    local home = GetFactionCamp(config.faction)
+    config.factionHomeCamp = home
+    -- Tong Kim / battlefield: keep Song/Kim camp, remember home for restore
+    if config.tongkim == 1 then
+        return
+    end
+    if config.isDoSat == 1 or config.camp == 5 then
+        config.isDoSat = 1
+        config.camp = 5
+    elseif config.mode == "train" and (config.level or 1) < 10 then
+        -- 0x newbie: chua nhap phai -> ten trang (camp 0)
+        config.camp = 0
+    else
+        config.camp = home
+    end
+end
+
+-- Call when leaving Tong Kim to restore Chinh/Trung/Ta color
+function RestoreSimBotFactionCamp(tbNpc)
+    if not tbNpc or tbNpc.tongkim == 1 then return end
+    tbNpc.isDoSat = nil
+    if ApplySimBotFactionCamp then ApplySimBotFactionCamp(tbNpc) end
+    if SetNpcCurCamp and tbNpc.finalIndex and tbNpc.finalIndex > 0 and tbNpc.camp then
+        SetNpcCurCamp(tbNpc.finalIndex, tbNpc.camp)
+    end
 end
 
 function KhoaTHP(nOwnerIndex, flag)
@@ -354,7 +399,7 @@ function SimCityTrimCell(s)
 end
 
 -- Same contract as server1-goc: split on "_", tonumber both parts.
--- Callers must treat nil x/y as "skip this node"  never insert into world.nodes.
+-- Callers must treat nil x/y as "skip this node" ï¿½ never insert into world.nodes.
 function nodeNameToCoords(nodeName)
     if nodeName == nil then
         return nil, nil
@@ -393,25 +438,25 @@ end
 function faction2DisplayName(faction)
     local tbSay = {}
     if faction == 1 then
-        return "Thin Vng Bang"
+        return "Thiï¿½n Vï¿½ï¿½ng Bang"
     elseif faction == 2 then
-        return "Thiu Lm"
+        return "Thiï¿½u Lï¿½m"
     elseif faction == 3 then
-        return "V ang"
+        return "Vï¿½ ï¿½ang"
     elseif faction == 4 then
-        return "Cn Ln"
+        return "Cï¿½n Lï¿½n"
     elseif faction == 5 then
-        return "ng Mn"
+        return "ï¿½ï¿½ï¿½ng Mï¿½n"
     elseif faction == 6 then
-        return "Ng c"
+        return "Ngï¿½ ï¿½ï¿½c"
     elseif faction == 7 then
         return "Nga Mi"
     elseif faction == 8 then
-        return "Thy Yn"
+        return "Thï¿½y Yï¿½n"
     elseif faction == 9 then
-        return "Ci Bang"
+        return "Cï¿½i Bang"
     elseif faction == 10 then
-        return "Thin Nhn"
+        return "Thiï¿½n Nhï¿½n"
     end
 end
 

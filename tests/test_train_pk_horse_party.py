@@ -18,9 +18,8 @@ class TestTrainPkHorseParty(unittest.TestCase):
         self.assertIn("TRAIN_DOSAT_PCT", src)
         self.assertIn("inviteBotToMyParty", src)
         self.assertIn("dosatPct", src)
-        # Peaceful train bots must NOT use camp 0 (unattackable)
-        self.assertIn("random(1, 3)", src)
-        self.assertNotIn("local camp = (isDoSat == 1 and 5) or 0", src)
+        self.assertIn("isDoSat", src)
+        self.assertIn("lv = random(m.minLv, m.maxLv)", src)
 
     def test_no_train_proximity_aggro_exception(self):
         src = open(os.path.join(SIM, "components", "sim.movement.lua"), encoding="utf-8", errors="replace").read()

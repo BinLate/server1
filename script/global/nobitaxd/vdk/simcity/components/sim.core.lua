@@ -27,7 +27,7 @@ function SimCore:initCharConfig(config)
     config.tick_canWalk = 0
     config.tick_canswitch = 0
     config.tick_canCast = 0
-    config.camp = config.camp or random(1, 3)
+    config.camp = config.camp or 1
     config.noRevive = config.noRevive or 0   
     config.fightingScore = 0
     config.rank = 1
@@ -164,13 +164,16 @@ function SimCore:initCharConfig(config)
                     SimProgression:UpdateBotSkills(config)
                 else
                     config.skillCastBua = {_p[1], 20}
-                    if config.faction == "duongmon" then config.skill351 = 351 end                  
-                    if SimBotDebuff[config.faction] then config.skillDebuffList = SimBotDebuff[config.faction] end
                 end
             end
 
     end
    
+    -- Camp theo phe mon phai (vang/xanh/tim) — sau khi da co faction
+    if ApplySimBotFactionCamp then
+        ApplySimBotFactionCamp(config)
+    end
+
     if config.series == 0 then
         config.nSettingsIdx = -1
     elseif config.series == 2 then
@@ -345,9 +348,20 @@ function SimEnsureCombatAttackable(tbNpc)
     if not tbNpc or not tbNpc.finalIndex or tbNpc.finalIndex <= 0 then return end
     if tbNpc.mode ~= "train" and tbNpc.tongkim ~= 1 and tbNpc.isAttackable ~= 1 then return end
     if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
-    -- Migrate legacy peaceful camp=0 -> camp 1-3 so players can Do Sat them
-    if tbNpc.mode == "train" and (tbNpc.camp == nil or tbNpc.camp == 0) then
-        tbNpc.camp = random(1, 3)
+    -- Keep faction camp stable (do not fight duel/party temporary camps)
+    if tbNpc.tongkim ~= 1 and tbNpc.mode == "train"
+       and not tbNpc.duelPlayerId and not tbNpc.partyPlayerId and not tbNpc.partyHuntCamp then
+        if GetFactionCamp and not tbNpc.factionHomeCamp then
+            tbNpc.factionHomeCamp = GetFactionCamp(tbNpc.faction)
+        end
+        if tbNpc.camp == 5 or tbNpc.isDoSat == 1 then
+            tbNpc.camp = 5
+            tbNpc.isDoSat = 1
+        elseif (tbNpc.level or 1) < 10 then
+            tbNpc.camp = 0
+        elseif tbNpc.factionHomeCamp then
+            tbNpc.camp = tbNpc.factionHomeCamp
+        end
     end
     if SetNpcCurCamp and tbNpc.camp ~= nil then SetNpcCurCamp(tbNpc.finalIndex, tbNpc.camp) end
 end

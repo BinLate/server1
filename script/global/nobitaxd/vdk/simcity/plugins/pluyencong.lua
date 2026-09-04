@@ -14,18 +14,56 @@ SimCityLuyenCong = {
 }
 
 SimCityLuyenCong.TRAIN_MAPS = {
-    -- mapId must match settings/.../thanhthi.txt
-    -- Do NOT use Ba Lang (53) / cities / thon stall maps
-    [1] = { name = "Kim Quang Dong (1-20)", mapId = 4, minLv = 1, maxLv = 20, count = 15 },
-    [2] = { name = "Phuc Nguu Son Tay (20-40)", mapId = 41, minLv = 20, maxLv = 40, count = 18 },
-    [3] = { name = "Kinh Hoang Dong (40-60)", mapId = 5, minLv = 40, maxLv = 60, count = 20 },
-    [4] = { name = "Vu Lang Dong (50-80)", mapId = 199, minLv = 50, maxLv = 80, count = 20 },
-    [5] = { name = "Lam Du Quan (60-80)", mapId = 319, minLv = 60, maxLv = 80, count = 20 },
-    [6] = { name = "Dao Hoa Nguyen (80-90)", mapId = 55, minLv = 80, maxLv = 90, count = 22 },
-    [7] = { name = "Truong Bach Son Nam (90-120)", mapId = 321, minLv = 90, maxLv = 120, count = 25 },
-    [8] = { name = "Mac Bac Thao Nguyen (120-150)", mapId = 341, minLv = 120, maxLv = 150, count = 25 },
-    [9] = { name = "Sa Mac Tang 1 (150-180)", mapId = 225, minLv = 150, maxLv = 180, count = 25 },
-    [10] = { name = "Vi Son Dao (180-200)", mapId = 342, minLv = 180, maxLv = 200, count = 25 }
+    -- mapId MUST exist in settings/global/vdk/simcity/maps/thanhthi.txt (path nodes).
+    -- Bracket = bot level range. Do NOT invent Map IDs.
+    -- 0x (1-9) thon/tran tan thu
+    [1]  = { name = "Giang Tan Thon (1-9)", mapId = 20, minLv = 1, maxLv = 9, count = 8 },
+    [2]  = { name = "Vinh Lac Tran (1-9)", mapId = 99, minLv = 1, maxLv = 9, count = 8 },
+    [3]  = { name = "Chu Tien Tran (1-9)", mapId = 100, minLv = 1, maxLv = 9, count = 8 },
+    [4]  = { name = "Dao Huong Thon (1-9)", mapId = 101, minLv = 1, maxLv = 9, count = 8 },
+    [5]  = { name = "Long Mon Tran (1-9)", mapId = 121, minLv = 1, maxLv = 9, count = 8 },
+    [6]  = { name = "Thach Co Tran (1-9)", mapId = 153, minLv = 1, maxLv = 9, count = 8 },
+    [7]  = { name = "Long Tuyen Thon (1-9)", mapId = 174, minLv = 1, maxLv = 9, count = 8 },
+    -- 1x (10-19) thanh thi + map luyen
+    [8]  = { name = "Phuong Tuong (10-19)", mapId = 1, minLv = 10, maxLv = 19, count = 8 },
+    [9]  = { name = "Bien Kinh (10-19)", mapId = 37, minLv = 10, maxLv = 19, count = 10 },
+    [10] = { name = "Lam An (10-19)", mapId = 176, minLv = 10, maxLv = 19, count = 10 },
+    [11] = { name = "Tuong Duong (10-19)", mapId = 78, minLv = 10, maxLv = 19, count = 8 },
+    [12] = { name = "Duong Chau (10-19)", mapId = 80, minLv = 10, maxLv = 19, count = 8 },
+    [13] = { name = "Dai Ly (10-19)", mapId = 162, minLv = 10, maxLv = 19, count = 8 },
+    [14] = { name = "Ba Lang Huyen (10-19)", mapId = 53, minLv = 10, maxLv = 19, count = 8 },
+    [15] = { name = "Moc Nhan Hang (10-19)", mapId = 111, minLv = 10, maxLv = 19, count = 10 },
+    [16] = { name = "Nhan Dang Son (10-19)", mapId = 195, minLv = 10, maxLv = 19, count = 10 },
+    [17] = { name = "Kim Quang Dong (10-19)", mapId = 4, minLv = 10, maxLv = 19, count = 12 },
+    -- 2x (20-29)
+    [18] = { name = "Kiem Cac Tay Bac (20-29)", mapId = 3, minLv = 20, maxLv = 29, count = 12 },
+    [19] = { name = "Kiem Cac Tay Nam (20-29)", mapId = 19, minLv = 20, maxLv = 29, count = 12 },
+    [20] = { name = "Kiem Cac Trung Nguyen (20-29)", mapId = 43, minLv = 20, maxLv = 29, count = 12 },
+    [21] = { name = "Tan Lang (20-29)", mapId = 7, minLv = 20, maxLv = 29, count = 12 },
+    [22] = { name = "Vu Lang Son (20-29)", mapId = 70, minLv = 20, maxLv = 29, count = 12 },
+    [23] = { name = "La Tieu Son (20-29)", mapId = 179, minLv = 20, maxLv = 29, count = 12 },
+    [24] = { name = "Bach Thuy Dong (20-29)", mapId = 71, minLv = 20, maxLv = 29, count = 10 },
+    [25] = { name = "Phuc Luu Dong (20-29)", mapId = 73, minLv = 20, maxLv = 29, count = 10 },
+    -- 3x (30-39)
+    [26] = { name = "Yen Tu Dong (30-39)", mapId = 77, minLv = 30, maxLv = 39, count = 14 },
+    [27] = { name = "Thuc Cuong Son (30-39)", mapId = 92, minLv = 30, maxLv = 39, count = 14 },
+    -- 4x (40-49)
+    [28] = { name = "Kinh Hoang Dong (40-49)", mapId = 5, minLv = 40, maxLv = 49, count = 14 },
+    [29] = { name = "Phuc Nguu Son Tay (40-49)", mapId = 41, minLv = 40, maxLv = 49, count = 14 },
+    [30] = { name = "Mat That Thieu Lam (40-49)", mapId = 113, minLv = 40, maxLv = 49, count = 12 },
+    [31] = { name = "Diem Thuong Dong Tang 3 (40-49)", mapId = 173, minLv = 40, maxLv = 49, count = 12 },
+    -- 5x (50-59)
+    [32] = { name = "Vu Lang Dong (50-59)", mapId = 199, minLv = 50, maxLv = 59, count = 16 },
+    -- 6x-7x (60-79)
+    [33] = { name = "Lam Du Quan (60-79)", mapId = 319, minLv = 60, maxLv = 79, count = 18 },
+    -- 8x (80-89)
+    [34] = { name = "Dao Hoa Nguyen (80-89)", mapId = 55, minLv = 80, maxLv = 89, count = 16 },
+    -- 9x + 90-120 (same map, one roster)
+    [35] = { name = "Truong Bach Son Nam (90-120)", mapId = 321, minLv = 90, maxLv = 120, count = 22 },
+    -- High brackets
+    [36] = { name = "Mac Bac Thao Nguyen (120-150)", mapId = 341, minLv = 120, maxLv = 150, count = 20 },
+    [37] = { name = "Sa Mac Tang 1 (150-180)", mapId = 225, minLv = 150, maxLv = 180, count = 20 },
+    [38] = { name = "Vi Son Dao (180-200)", mapId = 342, minLv = 180, maxLv = 200, count = 20 }
 }
 
 -- PK / Chat shouts for Do Sat (Camp 5) bots
@@ -148,18 +186,14 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
         savedIdx = savedIdx + 1
 
         local id = (savedBot and savedBot.nNpcId) or pool[random(1, getn(pool))]
-        local startLv = SIMBOT_TRAIN_START_LEVEL or 10
         local lv
         if savedBot and savedBot.level then
             lv = savedBot.level
-        else
-            if m.minLv <= startLv then
-                lv = startLv
-            else
-                lv = m.minLv
-            end
             if lv < m.minLv then lv = m.minLv end
             if lv > m.maxLv then lv = m.maxLv end
+        else
+            -- Map bracket -> random level inside bracket only
+            lv = random(m.minLv, m.maxLv)
         end
         local nExp = (savedBot and savedBot.nExp) or 0
         local szName = (savedBot and savedBot.szName) or nil
@@ -171,24 +205,14 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
         local weaponBranch = (savedBot and savedBot.weaponBranch) or nil
         local personality = (savedBot and savedBot.personality) or "balanced"
 
-        -- Peaceful grinders: camp 1-3 (NOT camp 0).
-        -- Camp 0 is unattackable by players in many JX1 builds even with murder PK.
-        -- Do Sat bots stay camp 5. Peaceful bots never initiate player PK.
+        -- Do Sat (camp 5) OR faction alignment camp (1/2/3) via ApplySimBotFactionCamp
         local dosatPct = TRAIN_DOSAT_PCT or 0
         local isDoSat = 0
         if dosatPct > 0 then
-            if savedBot and savedBot.camp == 5 then
+            if savedBot and (savedBot.camp == 5 or savedBot.isDoSat == 1) then
                 isDoSat = 1
             elseif random(1, 100) <= dosatPct then
                 isDoSat = 1
-            end
-        end
-        local camp = 5
-        if isDoSat ~= 1 then
-            if savedBot and savedBot.camp and savedBot.camp >= 1 and savedBot.camp <= 3 then
-                camp = savedBot.camp
-            else
-                camp = random(1, 3)
             end
         end
 
@@ -204,7 +228,8 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
             series = series,
             weaponBranch = weaponBranch,
             personality = personality,
-            camp = camp,
+            isDoSat = isDoSat,
+            camp = (isDoSat == 1 and 5) or nil,
             isFighting = 0,
             walkMode = "random",
             walkVar = 5,
@@ -272,6 +297,7 @@ function SimCityLuyenCong:hibernateMap(mapId)
                     weaponBranch = bot.weaponBranch or "taykhong",
                     nNpcId = bot.nNpcId or 100,
                     camp = bot.camp or 0,
+                    isDoSat = bot.isDoSat or 0,
                     personality = bot.personality or "balanced"
                 }
                 -- Check for pending migration to next map tier if bot outleveled current map

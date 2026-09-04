@@ -425,19 +425,40 @@ function SimProgression:UpdateBotSkills(tbNpc)
     local chosenSkillId = 53
     local chosenReqLv = 1
 
-    for i = 1, getn(skillList) do
-        local entry = skillList[i]
-        if lv >= entry.reqLv then
-            chosenSkillId = entry.id
-            chosenReqLv = entry.reqLv
-            break
+    -- Highest reqLv <= bot level (FACTION_SKILLS listed high-to-low)
+    if lv >= 10 then
+        for i = 1, getn(skillList) do
+            local entry = skillList[i]
+            if lv >= entry.reqLv then
+                chosenSkillId = entry.id
+                chosenReqLv = entry.reqLv
+                break
+            end
         end
+    else
+        -- 0x: chua nhap phai / chi danh thuong
+        chosenSkillId = 53
+        chosenReqLv = 1
     end
 
     local skLevel = self:CalcSkillLevel(lv, chosenReqLv)
     tbNpc.skillCastBua = { chosenSkillId, skLevel }
     tbNpc.skillCastBuaNoDebuff = { chosenSkillId, skLevel }
     tbNpc.attackSpeed = self:CalcAtkSpeed(lv)
+
+    -- Support skills also gated by level
+    tbNpc.skill351 = nil
+    tbNpc.skillDebuffList = nil
+    if fac == "duongmon" and lv >= 60 then
+        tbNpc.skill351 = 351
+    end
+    if fac == "ngudoc" then
+        local debuffs = {}
+        if lv >= 50 then tinsert(debuffs, 72) end
+        if lv >= 60 then tinsert(debuffs, 73) end
+        if lv >= 90 then tinsert(debuffs, 390) end
+        if getn(debuffs) > 0 then tbNpc.skillDebuffList = debuffs end
+    end
 end
 
 -- 8. CAP NHAT NGOAI TRANG VA THU CUOI THEO CHUAN VLTK1 KINH DIEN
