@@ -17,23 +17,34 @@ if not GetNpcAroundNpcList then
     end
 end
 
-function split(szFullString, szSeparator)
-    if not szFullString or szFullString == "" then return {} end
-    szSeparator = szSeparator or "_"
-    local nFindStartIndex = 1
-    local nSplitIndex = 1
-    local nSplitArray = {}
-    while true do
-        local nFindLastIndex = strfind(szFullString, szSeparator, nFindStartIndex, 1)
-        if not nFindLastIndex then
-            nSplitArray[nSplitIndex] = strsub(szFullString, nFindStartIndex, strlen(szFullString))
-            break
+-- IMPORTANT: do NOT redefine split() here.
+-- A previous custom split used strfind(s, sep, init, 1) (Lua 5 "plain" flag).
+-- Kingsoft Lua 4.0 does not handle that 4th arg correctly, so "_" never matched,
+-- nodeNameToCoords failed on every "x_y", and loadMap dropped all preset nodes.
+-- Prefer script/lib/string.lua split (loaded by head.lua). Provide fallback if absent.
+if not split then
+    function split(str, splitor)
+        if splitor == nil then
+            splitor = ","
         end
-        nSplitArray[nSplitIndex] = strsub(szFullString, nFindStartIndex, nFindLastIndex - 1)
-        nFindStartIndex = nFindLastIndex + strlen(szSeparator)
-        nSplitIndex = nSplitIndex + 1
+        local strArray = {}
+        local strStart = 1
+        local splitorLen = strlen(splitor)
+        local index = strfind(str, splitor, strStart)
+        if index == nil then
+            strArray[1] = str
+            return strArray
+        end
+        local i = 1
+        while index do
+            strArray[i] = strsub(str, strStart, index - 1)
+            i = i + 1
+            strStart = index + splitorLen
+            index = strfind(str, splitor, strStart)
+        end
+        strArray[i] = strsub(str, strStart, strlen(str))
+        return strArray
     end
-    return nSplitArray
 end
 
 -- Helpers
@@ -53,19 +64,22 @@ function GetTabFileData(path, tab_name, start_row, max_col) -- Doc file txt
     return tbData, nCount - start_row + 1
 end
 
-isChinese = { "<", ">", "ª¹", "³", "newboss", "²", "´", "åâ", "£¨", "¼ý", "ýË", "¼þ", "¼þ", "£", "º", "±", "¡", "»", "ÙÁ",
-    "±", "··", "ÈË" }
+isChinese = { "<", ">", "ï¿½ï¿½", "ï¿½", "newboss", "ï¿½", "ï¿½", "ï¿½ï¿½", "ï¿½ï¿½", "ï¿½ï¿½", "ï¿½ï¿½", "ï¿½ï¿½", "ï¿½ï¿½", "ï¿½", "ï¿½", "ï¿½", "ï¿½", "ï¿½", "ï¿½ï¿½",
+    "ï¿½", "ï¿½ï¿½", "ï¿½ï¿½" }
 function fixName(inp)
     local found = false
     for i = 1, getn(isChinese) do
         if strfind(inp, isChinese[i]) ~= nil then
-            return "Qu¸i kh¸ch"
+            return "Quï¿½i khï¿½ch"
         end
     end
     return inp
 end
 
 function GetDistanceRadius(nX, nY, oX, oY)
+    if not nX or not nY or not oX or not oY then
+        return 999999
+    end
     return sqrt((nX - oX) * (nX - oX) + (nY - oY) * (nY - oY))
 end
 
@@ -152,6 +166,51 @@ function IsAttackableCamp(camp1, camp2)
     return 0
 end
 
+-- Engine camp colors (npcthunghiem.lua): 1=Chinh/vang, 3=Trung lap/xanh, 2=Ta/tim, 0=trang, 5=Do Sat
+-- NOT by Ngu Hanh / series. No Bang -> faction alignment only.
+function GetFactionCamp(faction)
+    if faction == "thieulam" or faction == "ngami" or faction == "caibang" or faction == "vodang" then
+        return 1
+    end
+    if faction == "thienvuong" or faction == "duongmon" or faction == "thuyyen" or faction == "conlon" then
+        return 3
+    end
+    if faction == "ngudoc" or faction == "thiennhan" then
+        return 2
+    end
+    return 1
+end
+
+-- Apply camp for non-TongKim SimBots. Tong Kim keeps battlefield camp until leave.
+function ApplySimBotFactionCamp(config)
+    if not config then return end
+    local home = GetFactionCamp(config.faction)
+    config.factionHomeCamp = home
+    -- Tong Kim / battlefield: keep Song/Kim camp, remember home for restore
+    if config.tongkim == 1 then
+        return
+    end
+    if config.isDoSat == 1 or config.camp == 5 then
+        config.isDoSat = 1
+        config.camp = 5
+    elseif config.mode == "train" and (config.level or 1) < 10 then
+        -- 0x newbie: chua nhap phai -> ten trang (camp 0)
+        config.camp = 0
+    else
+        config.camp = home
+    end
+end
+
+-- Call when leaving Tong Kim to restore Chinh/Trung/Ta color
+function RestoreSimBotFactionCamp(tbNpc)
+    if not tbNpc or tbNpc.tongkim == 1 then return end
+    tbNpc.isDoSat = nil
+    if ApplySimBotFactionCamp then ApplySimBotFactionCamp(tbNpc) end
+    if SetNpcCurCamp and tbNpc.finalIndex and tbNpc.finalIndex > 0 and tbNpc.camp then
+        SetNpcCurCamp(tbNpc.finalIndex, tbNpc.camp)
+    end
+end
+
 function KhoaTHP(nOwnerIndex, flag)
     if nOwnerIndex > 0 then
         CallPlayerFunction(nOwnerIndex, DisabledUseTownP, flag)
@@ -190,10 +249,70 @@ function arrRandomExtracItems(arr, n)
 end
 
 
+-- [SimBot fix] Pure-Lua fallback reader (engine iolib). Used when the
+-- TabFile C API is unavailable, so simbot data loading can never hard-fail.
+function SimCityPathToNative(szPath)
+	local out = szPath
+	local i = strfind(out, "\\")
+	while i do
+		out = strsub(out, 1, i - 1) .. "/" .. strsub(out, i + 1)
+		i = strfind(out, "\\")
+	end
+	if strsub(out, 1, 1) == "/" then
+		out = strsub(out, 2)
+	end
+	return out
+end
+
+function SimCityTableFromFileFallback(strFilePatch, tbPattern)
+	if not openfile or not read or not closefile then
+		return {}
+	end
+	local f = openfile(SimCityPathToNative(strFilePatch), "r")
+	if not f then
+		print("SimCityTableFromFile: cannot open "..tostring(strFilePatch))
+		return {}
+	end
+	local tbResult = {}
+	local nRow = 0
+	local szLine = read(f, "*l")
+	while szLine do
+		nRow = nRow + 1
+		if nRow > 1 then
+			local tbCells = split(szLine, "\t")
+			local tbRow = {}
+			for j = 1, getn(tbPattern) do
+				local szCell = tbCells[j]
+				if tbPattern[j] == "*n" then
+					if szCell == nil or szCell == "" then
+						tinsert(tbRow, 0)
+					else
+						tinsert(tbRow, tonumber(SimCityTrimCell(szCell)) or 0)
+					end
+				else
+					if szCell == nil then
+						tinsert(tbRow, "")
+					else
+						tinsert(tbRow, SimCityTrimCell(szCell))
+					end
+				end
+			end
+			tinsert(tbResult, tbRow)
+		end
+		szLine = read(f, "*l")
+	end
+	closefile(f)
+	return tbResult
+end
+
+
 function SimCityTableFromFile(strFilePatch, tbPattern)	
-	if (TabFile_Load(strFilePatch, strFilePatch) == 0) then
+	if not TabFile_Load then
+		IncludeLib("FILESYS")
+	end
+	if (not TabFile_Load or TabFile_Load(strFilePatch, strFilePatch) == 0) then
 		print("Load TabFile Error!"..strFilePatch)
-		return nil
+		return SimCityTableFromFileFallback(strFilePatch, tbPattern)
 	else
 		local tbResult = {}
 		local nRowCount = TabFile_GetRowCount(strFilePatch)
@@ -204,17 +323,18 @@ function SimCityTableFromFile(strFilePatch, tbPattern)
 				local tmp = nil
 				if tbPattern[j] == "*n" then
                     local cell = TabFile_GetCell(strFilePatch, i, j)
+                    cell = SimCityTrimCell(cell)
                     if cell == nil or cell == "" then
                         tmp = 0
                     else
-                        tmp = tonumber(cell)
+                        tmp = tonumber(cell) or 0
                     end
 				elseif tbPattern[j] == "*w" then
                     local cell = TabFile_GetCell(strFilePatch, i, j)
                     if cell == nil or cell == "" then
                         tmp = ""
                     else
-                        tmp = tostring(cell)
+                        tmp = SimCityTrimCell(tostring(cell))
                     end
 				end
 				tinsert(tbResult[i-1], tmp)
@@ -226,8 +346,10 @@ end
 
 function getObjectKeys(tbl)
     local result = {}
-    for k,v in tbl do
-        tinsert(result, k)
+    if tbl and next(tbl, nil) then
+        for k,v in tbl do
+            tinsert(result, k)
+        end
     end
     return result
 end
@@ -252,7 +374,40 @@ function getClosestNode(nodes, nX, nY)
 end
 
 
+-- Strip CR/LF/spaces that TabFile or CRLF text files leave on cells.
+-- Without this, names like "1881_2598\r" make tonumber(y) nil and poison world.nodes.
+function SimCityTrimCell(s)
+    if s == nil then
+        return ""
+    end
+    s = tostring(s)
+    while strfind(s, "\r") do
+        local i = strfind(s, "\r")
+        s = strsub(s, 1, i - 1) .. strsub(s, i + 1)
+    end
+    while strfind(s, "\n") do
+        local i = strfind(s, "\n")
+        s = strsub(s, 1, i - 1) .. strsub(s, i + 1)
+    end
+    while strsub(s, 1, 1) == " " or strsub(s, 1, 1) == "\t" do
+        s = strsub(s, 2)
+    end
+    while strlen(s) > 0 and (strsub(s, strlen(s)) == " " or strsub(s, strlen(s)) == "\t") do
+        s = strsub(s, 1, strlen(s) - 1)
+    end
+    return s
+end
+
+-- Same contract as server1-goc: split on "_", tonumber both parts.
+-- Callers must treat nil x/y as "skip this node" ï¿½ never insert into world.nodes.
 function nodeNameToCoords(nodeName)
+    if nodeName == nil then
+        return nil, nil
+    end
+    nodeName = SimCityTrimCell(nodeName)
+    if nodeName == "" then
+        return nil, nil
+    end
     local point = split(nodeName, "_")
     local x = tonumber(point[1])
     local y = tonumber(point[2])
@@ -283,25 +438,25 @@ end
 function faction2DisplayName(faction)
     local tbSay = {}
     if faction == 1 then
-        return "Thiªn V­¬ng Bang"
+        return "Thiï¿½n Vï¿½ï¿½ng Bang"
     elseif faction == 2 then
-        return "ThiÕu L©m"
+        return "Thiï¿½u Lï¿½m"
     elseif faction == 3 then
-        return "Vâ §ang"
+        return "Vï¿½ ï¿½ang"
     elseif faction == 4 then
-        return "C«n L«n"
+        return "Cï¿½n Lï¿½n"
     elseif faction == 5 then
-        return "§­êng M«n"
+        return "ï¿½ï¿½ï¿½ng Mï¿½n"
     elseif faction == 6 then
-        return "Ngò §éc"
+        return "Ngï¿½ ï¿½ï¿½c"
     elseif faction == 7 then
         return "Nga Mi"
     elseif faction == 8 then
-        return "Thóy Yªn"
+        return "Thï¿½y Yï¿½n"
     elseif faction == 9 then
-        return "C¸i Bang"
+        return "Cï¿½i Bang"
     elseif faction == 10 then
-        return "Thiªn NhÉn"
+        return "Thiï¿½n Nhï¿½n"
     end
 end
 
@@ -385,7 +540,8 @@ function SimCityCanFight(tbNpc)
     end
     local _pe = tbNpc.isPlayerEnemyAround
     local _peCD = _pe and _pe > 0 and (not GetPlayerPkMode or not PIdx2NpcIdx or GetPlayerPkMode(PIdx2NpcIdx(_pe)) ~= 0)
-    if tbNpc.mode ~= "train" and not (tbNpc.tongkim == 1 and tbNpc.worldInfo and tbNpc.worldInfo.tkWarStarted == 1) and not _peCD and not tbNpc.duelPlayerId then return 0 end  
+	local outdoorOk = (wi.allowFighting == 1 and wi.cityPeace ~= 1)
+    if tbNpc.mode ~= "train" and not (tbNpc.tongkim == 1 and tbNpc.worldInfo and tbNpc.worldInfo.tkWarStarted == 1) and not _peCD and not tbNpc.duelPlayerId and not outdoorOk then return 0 end  
     if tbNpc.selfDefTick and tbNpc.tick_breath and tbNpc.selfDefTick > tbNpc.tick_breath then return 1 end
     if tbNpc.tongkim == 1 and tbNpc.worldInfo and tbNpc.worldInfo.tkWarStarted ~= 1 then return 0 end  
     if wi.cityPeace == 1 then return 1 end                                   

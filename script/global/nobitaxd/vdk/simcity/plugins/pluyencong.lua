@@ -14,15 +14,56 @@ SimCityLuyenCong = {
 }
 
 SimCityLuyenCong.TRAIN_MAPS = {
-    [1] = { name = "Ba Lang Huyen (1-20)", mapId = 53, minLv = 1, maxLv = 20, count = 15 },
-    [2] = { name = "Phuc Nguu Son (20-40)", mapId = 11, minLv = 20, maxLv = 40, count = 18 },
-    [3] = { name = "Kinh Hoang Dong (40-60)", mapId = 17, minLv = 40, maxLv = 60, count = 20 },
-    [4] = { name = "Lam Du Quan (60-80)", mapId = 70, minLv = 60, maxLv = 80, count = 20 },
-    [5] = { name = "Dao Hoa Dao (80-90)", mapId = 181, minLv = 80, maxLv = 90, count = 22 },
-    [6] = { name = "Truong Bach Son Nam (90-120)", mapId = 321, minLv = 90, maxLv = 120, count = 25 },
-    [7] = { name = "Mac Bac Thao Nguyen (120-150)", mapId = 325, minLv = 120, maxLv = 150, count = 25 },
-    [8] = { name = "Sa Mac Dia Dao (150-180)", mapId = 225, minLv = 150, maxLv = 180, count = 25 },
-    [9] = { name = "Vi Son Dao (180-200)", mapId = 340, minLv = 180, maxLv = 200, count = 25 }
+    -- mapId MUST exist in settings/global/vdk/simcity/maps/thanhthi.txt (path nodes).
+    -- Bracket = bot level range. Do NOT invent Map IDs.
+    -- 0x (1-9) thon/tran tan thu
+    [1]  = { name = "Giang Tan Thon (1-9)", mapId = 20, minLv = 1, maxLv = 9, count = 8 },
+    [2]  = { name = "Vinh Lac Tran (1-9)", mapId = 99, minLv = 1, maxLv = 9, count = 8 },
+    [3]  = { name = "Chu Tien Tran (1-9)", mapId = 100, minLv = 1, maxLv = 9, count = 8 },
+    [4]  = { name = "Dao Huong Thon (1-9)", mapId = 101, minLv = 1, maxLv = 9, count = 8 },
+    [5]  = { name = "Long Mon Tran (1-9)", mapId = 121, minLv = 1, maxLv = 9, count = 8 },
+    [6]  = { name = "Thach Co Tran (1-9)", mapId = 153, minLv = 1, maxLv = 9, count = 8 },
+    [7]  = { name = "Long Tuyen Thon (1-9)", mapId = 174, minLv = 1, maxLv = 9, count = 8 },
+    -- 1x (10-19) thanh thi + map luyen
+    [8]  = { name = "Phuong Tuong (10-19)", mapId = 1, minLv = 10, maxLv = 19, count = 8 },
+    [9]  = { name = "Bien Kinh (10-19)", mapId = 37, minLv = 10, maxLv = 19, count = 10 },
+    [10] = { name = "Lam An (10-19)", mapId = 176, minLv = 10, maxLv = 19, count = 10 },
+    [11] = { name = "Tuong Duong (10-19)", mapId = 78, minLv = 10, maxLv = 19, count = 8 },
+    [12] = { name = "Duong Chau (10-19)", mapId = 80, minLv = 10, maxLv = 19, count = 8 },
+    [13] = { name = "Dai Ly (10-19)", mapId = 162, minLv = 10, maxLv = 19, count = 8 },
+    [14] = { name = "Ba Lang Huyen (10-19)", mapId = 53, minLv = 10, maxLv = 19, count = 8 },
+    [15] = { name = "Moc Nhan Hang (10-19)", mapId = 111, minLv = 10, maxLv = 19, count = 10 },
+    [16] = { name = "Nhan Dang Son (10-19)", mapId = 195, minLv = 10, maxLv = 19, count = 10 },
+    [17] = { name = "Kim Quang Dong (10-19)", mapId = 4, minLv = 10, maxLv = 19, count = 12 },
+    -- 2x (20-29)
+    [18] = { name = "Kiem Cac Tay Bac (20-29)", mapId = 3, minLv = 20, maxLv = 29, count = 12 },
+    [19] = { name = "Kiem Cac Tay Nam (20-29)", mapId = 19, minLv = 20, maxLv = 29, count = 12 },
+    [20] = { name = "Kiem Cac Trung Nguyen (20-29)", mapId = 43, minLv = 20, maxLv = 29, count = 12 },
+    [21] = { name = "Tan Lang (20-29)", mapId = 7, minLv = 20, maxLv = 29, count = 12 },
+    [22] = { name = "Vu Lang Son (20-29)", mapId = 70, minLv = 20, maxLv = 29, count = 12 },
+    [23] = { name = "La Tieu Son (20-29)", mapId = 179, minLv = 20, maxLv = 29, count = 12 },
+    [24] = { name = "Bach Thuy Dong (20-29)", mapId = 71, minLv = 20, maxLv = 29, count = 10 },
+    [25] = { name = "Phuc Luu Dong (20-29)", mapId = 73, minLv = 20, maxLv = 29, count = 10 },
+    -- 3x (30-39)
+    [26] = { name = "Yen Tu Dong (30-39)", mapId = 77, minLv = 30, maxLv = 39, count = 14 },
+    [27] = { name = "Thuc Cuong Son (30-39)", mapId = 92, minLv = 30, maxLv = 39, count = 14 },
+    -- 4x (40-49)
+    [28] = { name = "Kinh Hoang Dong (40-49)", mapId = 5, minLv = 40, maxLv = 49, count = 14 },
+    [29] = { name = "Phuc Nguu Son Tay (40-49)", mapId = 41, minLv = 40, maxLv = 49, count = 14 },
+    [30] = { name = "Mat That Thieu Lam (40-49)", mapId = 113, minLv = 40, maxLv = 49, count = 12 },
+    [31] = { name = "Diem Thuong Dong Tang 3 (40-49)", mapId = 173, minLv = 40, maxLv = 49, count = 12 },
+    -- 5x (50-59)
+    [32] = { name = "Vu Lang Dong (50-59)", mapId = 199, minLv = 50, maxLv = 59, count = 16 },
+    -- 6x-7x (60-79)
+    [33] = { name = "Lam Du Quan (60-79)", mapId = 319, minLv = 60, maxLv = 79, count = 18 },
+    -- 8x (80-89)
+    [34] = { name = "Dao Hoa Nguyen (80-89)", mapId = 55, minLv = 80, maxLv = 89, count = 16 },
+    -- 9x + 90-120 (same map, one roster)
+    [35] = { name = "Truong Bach Son Nam (90-120)", mapId = 321, minLv = 90, maxLv = 120, count = 22 },
+    -- High brackets
+    [36] = { name = "Mac Bac Thao Nguyen (120-150)", mapId = 341, minLv = 120, maxLv = 150, count = 20 },
+    [37] = { name = "Sa Mac Tang 1 (150-180)", mapId = 225, minLv = 150, maxLv = 180, count = 20 },
+    [38] = { name = "Vi Son Dao (180-200)", mapId = 342, minLv = 180, maxLv = 200, count = 20 }
 }
 
 -- PK / Chat shouts for Do Sat (Camp 5) bots
@@ -145,17 +186,35 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
         savedIdx = savedIdx + 1
 
         local id = (savedBot and savedBot.nNpcId) or pool[random(1, getn(pool))]
-        local lv = (savedBot and savedBot.level) or random(m.minLv, m.maxLv)
+        local lv
+        if savedBot and savedBot.level then
+            lv = savedBot.level
+            if lv < m.minLv then lv = m.minLv end
+            if lv > m.maxLv then lv = m.maxLv end
+        else
+            -- Map bracket -> random level inside bracket only
+            lv = random(m.minLv, m.maxLv)
+        end
         local nExp = (savedBot and savedBot.nExp) or 0
         local szName = (savedBot and savedBot.szName) or nil
+        if (not szName) or szName == "" or (strfind and strfind(szName, "Temple")) then
+            szName = SimCityNPCInfo:generateName()
+        end
         local faction = (savedBot and savedBot.faction) or nil
         local series = (savedBot and savedBot.series) or nil
         local weaponBranch = (savedBot and savedBot.weaponBranch) or nil
         local personality = (savedBot and savedBot.personality) or "balanced"
 
-        -- 5-10% ty le bot bat Do Sat (Camp 5)
-        local isDoSat = (savedBot and savedBot.camp == 5) or (random(1, 100) <= 8)
-        local camp = (isDoSat and 5) or 0
+        -- Do Sat (camp 5) OR faction alignment camp (1/2/3) via ApplySimBotFactionCamp
+        local dosatPct = TRAIN_DOSAT_PCT or 0
+        local isDoSat = 0
+        if dosatPct > 0 then
+            if savedBot and (savedBot.camp == 5 or savedBot.isDoSat == 1) then
+                isDoSat = 1
+            elseif random(1, 100) <= dosatPct then
+                isDoSat = 1
+            end
+        end
 
         local tbNpc = {
             nNpcId = id,
@@ -164,22 +223,28 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
             level = lv,
             nExp = nExp,
             szName = szName,
+            hardsetName = szName,
             faction = faction,
             series = series,
             weaponBranch = weaponBranch,
             personality = personality,
-            camp = camp,
-            isFighting = 1,
+            isDoSat = isDoSat,
+            camp = (isDoSat == 1 and 5) or nil,
+            isFighting = 0,
             walkMode = "random",
             walkVar = 5,
             noRevive = 0,
             capHP = cap,
             ngoaitrang = 1,
-            CHANCE_ATTACK_PLAYER = (isDoSat and 1) or 0,
-            CHANCE_ATTACK_NPC = (isDoSat and 1) or 0,
+            CHANCE_ATTACK_PLAYER = (isDoSat == 1 and 1) or 0,
+            -- Must be >1 so Case3 can start a fight alone (see sim.movement)
+            CHANCE_ATTACK_NPC = 2,
             CHANCE_JOIN_FIGHT = 1,
-            RADIUS_FIGHT_PLAYER = (isDoSat and 20) or 10,
-            RADIUS_FIGHT_NPC = (isDoSat and 20) or 10
+            RADIUS_FIGHT_PLAYER = (isDoSat == 1 and 20) or 15,
+            RADIUS_FIGHT_NPC = (isDoSat == 1 and 20) or 15,
+            RADIUS_FIGHT_SCAN = 20,
+            leaveFightWhenNoEnemy = 0,
+            noStop = 1
         }
 
         local nListId = SimCitizen:New(tbNpc)
@@ -187,7 +252,7 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
             spawnedCount = spawnedCount + 1
             local bot = SimCitizen:Get(nListId)
             if bot and bot.finalIndex and bot.finalIndex > 0 then
-                if isDoSat and SimCityLuyenCong.PK_SHOUTS and getn(SimCityLuyenCong.PK_SHOUTS) > 0 then
+                if isDoSat == 1 and SimCityLuyenCong.PK_SHOUTS and getn(SimCityLuyenCong.PK_SHOUTS) > 0 then
                     local shout = SimCityLuyenCong.PK_SHOUTS[random(1, getn(SimCityLuyenCong.PK_SHOUTS))]
                     if NpcChat then NpcChat(bot.finalIndex, shout) end
                 end
@@ -232,6 +297,7 @@ function SimCityLuyenCong:hibernateMap(mapId)
                     weaponBranch = bot.weaponBranch or "taykhong",
                     nNpcId = bot.nNpcId or 100,
                     camp = bot.camp or 0,
+                    isDoSat = bot.isDoSat or 0,
                     personality = bot.personality or "balanced"
                 }
                 -- Check for pending migration to next map tier if bot outleveled current map
@@ -301,21 +367,41 @@ function SimCityLuyenCong:ATick()
 end
 
 function SimCityLuyenCong:mainMenu()
-    local text = "<color=yellow>=== HE THONG LUYEN CONG SIMBOT (DYNAMIC AOI) ===<color>\n"
-    text = text .. "Trang thai phan bo Simbot luyen cong tu dong theo vi tri nguoi choi:\n"
+    -- ASCII-only menu text (CreateTaskSay splits on '/'; never put '/' in label)
+    -- Do not use <color=...> here — many clients show raw tags in option rows
+    local text = "=== HE THONG LUYEN CONG SIMBOT (DYNAMIC AOI) ==="
+    text = text .. "<enter>Trang thai phan bo Simbot train theo vi tri nguoi choi:"
     local tbSay = { text }
 
     for i = 1, getn(self.TRAIN_MAPS) do
         local m = self.TRAIN_MAPS[i]
         local state = self.mapState[m.mapId]
-        local statusStr = (state and state.isSpawned == 1 and "<color=green>[Dang Hoat Dong - " .. (state.botCount or 0) .. " Bot]<color>") or "<color=gray>[Nghi / Hibernate 0% CPU]<color>"
+        local statusStr
+        if state and state.isSpawned == 1 then
+            statusStr = "[Dang train - " .. (state.botCount or 0) .. " bot]"
+        else
+            statusStr = "[Nghi - Hibernate]"
+        end
         tinsert(tbSay, m.name .. " " .. statusStr .. "/#SimCityLuyenCong:spawnForMap(" .. i .. ")")
     end
 
     tinsert(tbSay, "Kich hoat toan bo cac map luyen cong/#SimCityLuyenCong:spawnAllMaps()")
-    tinsert(tbSay, "Thu hoi / Don dep toan bo bot luyen cong/#SimCityLuyenCong:removeAll()")
+    tinsert(tbSay, "Moi SimBot gan vao PT cua toi/#SimCityLuyenCong:inviteBotToMyParty()")
+    tinsert(tbSay, "Thu hoi - Don dep toan bo bot luyen cong/#SimCityLuyenCong:removeAll()")
     tinsert(tbSay, "Ket thuc doi thoai/no")
     CreateTaskSay(tbSay)
+end
+
+function SimCityLuyenCong:inviteBotToMyParty()
+    local ok = 0
+    if SimParty and SimParty.InviteNearestBotToPlayer and PlayerIndex then
+        ok = SimParty:InviteNearestBotToPlayer(PlayerIndex, nil, 30)
+    end
+    if ok == 1 then
+        Msg2Player("Da moi SimBot gan nhat vao PT (follow).")
+    else
+        Msg2Player("Khong tim thay SimBot train gan (trong 30 o).")
+    end
 end
 
 function SimCityLuyenCong:spawnAllMaps()

@@ -126,15 +126,26 @@ function SimCityWorld:New(data)
 end
 
 function SimCityWorld:Get(nW)
-	if self.data["w" .. nW] ~= nil and self.data["w" .. nW] ~= nil then
-		return self.data["w" .. nW]
-	else
-		return {}
+	local key = "w" .. nW
+	if self.data[key] ~= nil then
+		return self.data[key]
 	end
+	-- Lazy hydrate from SimCityMap so EnterMap never mutates a throwaway {}
+	if SimCityMap and SimCityMap[nW] then
+		self:New(SimCityMap[nW])
+		if self.data[key] ~= nil then
+			return self.data[key]
+		end
+	end
+	return {}
 end
 
 function SimCityWorld:Update(nW, key, value)
 	local data = self:Get(nW)
+	-- Refuse writes onto ephemeral empty tables (unknown map / not hydrated)
+	if data == nil or next(data, nil) == nil then
+		return
+	end
 	data[key] = value
 end
 
@@ -177,8 +188,10 @@ function SimCityWorld:ShowTrangTri(nW, show)
 	end
 end
 function SimCityWorld:initThanhThi()
-	for worldId, worldInfo in SimCityMap do
-		self:New(worldInfo)
+	if SimCityMap and next(SimCityMap, nil) then
+		for worldId, worldInfo in SimCityMap do
+			self:New(worldInfo)
+		end
 	end
 end
 

@@ -342,20 +342,48 @@ SimProgression.FACTION_SKILLS = {
     }
 }
 
--- 5. BANG TRA CUU KY CHIEN (HORSE SKILLS: HorseLimit >= 1 in skills.txt)
-SimProgression.HORSE_SKILLS = {
-    [10] = 1, [17] = 1, [30] = 1, [47] = 1, [50] = 1, [54] = 1,
-    [85] = 1, [91] = 1, [102] = 1, [128] = 1, [155] = 1, [164] = 1,
-    [271] = 1, [283] = 1, [284] = 1, [286] = 1, [288] = 1, [290] = 1,
-    [302] = 1, [304] = 1, [321] = 1, [322] = 1, [323] = 1, [325] = 1,
-    [342] = 1, [351] = 1, [361] = 1, [362] = 1, [373] = 1, [375] = 1,
-    [389] = 1, [429] = 1, [1055] = 1, [1058] = 1, [1059] = 1, [1060] = 1,
-    [1069] = 1, [1070] = 1, [1076] = 1, [1109] = 1
-}
+-- 5. KY CHIEN / RANGE: authoritative SimSkillMeta from settings/skills.txt
+Include("\\script\\global\\nobitaxd\\vdk\\simcity\\components\\sim.skill_meta.lua")
 
 function SimProgression:CanCastOnHorse(skillId)
-    if not skillId or skillId <= 0 then return 0 end
-    return self.HORSE_SKILLS[skillId] or 0
+    if SimSkillMeta and SimSkillMeta.CanCastOnHorse then
+        return SimSkillMeta:CanCastOnHorse(skillId)
+    end
+    -- DEFAULT DENY
+    return 0
+end
+
+function SimProgression:GetSkillCombatMeta(skillId)
+    if SimSkillMeta and SimSkillMeta.GetSkillCombatMeta then
+        return SimSkillMeta:GetSkillCombatMeta(skillId)
+    end
+    return nil
+end
+
+function SimProgression:GetSkillAttackRadius(skillId)
+    if SimSkillMeta and SimSkillMeta.GetAttackRadiusPixels then
+        local px = SimSkillMeta:GetAttackRadiusPixels(skillId)
+        if px then return px end
+    end
+    -- Do NOT invent 90px for unknown skills
+    if not skillId then return nil end
+    if self.SKILL_ATTACK_RADIUS and self.SKILL_ATTACK_RADIUS[skillId] then
+        return self.SKILL_ATTACK_RADIUS[skillId]
+    end
+    return nil
+end
+
+function SimProgression:GetSkillAttackRadiusTiles(skillId)
+    if SimSkillMeta and SimSkillMeta.GetAttackRadiusTiles then
+        local t = SimSkillMeta:GetAttackRadiusTiles(skillId)
+        if t then return t end
+    end
+    local px = self:GetSkillAttackRadius(skillId)
+    if not px or px <= 0 then return nil end
+    -- ceil(px/32)
+    local tiles = floor((px + 31) / 32)
+    if tiles < 1 then tiles = 1 end
+    return tiles
 end
 
 -- 6. TINH TOAN CAP DO SKILL THEO CAP NHAN VAT
@@ -397,19 +425,40 @@ function SimProgression:UpdateBotSkills(tbNpc)
     local chosenSkillId = 53
     local chosenReqLv = 1
 
-    for i = 1, getn(skillList) do
-        local entry = skillList[i]
-        if lv >= entry.reqLv then
-            chosenSkillId = entry.id
-            chosenReqLv = entry.reqLv
-            break
+    -- Highest reqLv <= bot level (FACTION_SKILLS listed high-to-low)
+    if lv >= 10 then
+        for i = 1, getn(skillList) do
+            local entry = skillList[i]
+            if lv >= entry.reqLv then
+                chosenSkillId = entry.id
+                chosenReqLv = entry.reqLv
+                break
+            end
         end
+    else
+        -- 0x: chua nhap phai / chi danh thuong
+        chosenSkillId = 53
+        chosenReqLv = 1
     end
 
     local skLevel = self:CalcSkillLevel(lv, chosenReqLv)
     tbNpc.skillCastBua = { chosenSkillId, skLevel }
     tbNpc.skillCastBuaNoDebuff = { chosenSkillId, skLevel }
     tbNpc.attackSpeed = self:CalcAtkSpeed(lv)
+
+    -- Support skills also gated by level
+    tbNpc.skill351 = nil
+    tbNpc.skillDebuffList = nil
+    if fac == "duongmon" and lv >= 60 then
+        tbNpc.skill351 = 351
+    end
+    if fac == "ngudoc" then
+        local debuffs = {}
+        if lv >= 50 then tinsert(debuffs, 72) end
+        if lv >= 60 then tinsert(debuffs, 73) end
+        if lv >= 90 then tinsert(debuffs, 390) end
+        if getn(debuffs) > 0 then tbNpc.skillDebuffList = debuffs end
+    end
 end
 
 -- 8. CAP NHAT NGOAI TRANG VA THU CUOI THEO CHUAN VLTK1 KINH DIEN
@@ -612,88 +661,73 @@ function SimProgression:SanitizeName(szName)
 end
 
 -- 10.6. PERSISTENCE: LUU VA DOC ROSTER SIMBOT LUYEN CONG (ATOMIC SAVE)
-local function _sim_open(path, mode)
+function _sim_open(path, mode)
     if openfile then return openfile(path, mode) end
     if io and io.open then return io.open(path, mode) end
     return nil
 end
-local function _sim_flush(f)
+-- Kingsoft Lua 4.0 rejects nested functions that capture outer locals
+-- ("cannot access a variable in outer scope"). Always pass args to pcall
+-- directly — never wrap a method call inside an anonymous pcall callback.
+function _sim_pcall_result(ok, res, err)
+    if not ok then return 0 end
+    if res == false or res == 0 then return 0 end
+    if res == nil and err ~= nil then return 0 end
+    return 1
+end
+function _sim_flush(f)
     if not f then return 0 end
     if flushfile then
         local ok, res, err = pcall(flushfile, f)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        return _sim_pcall_result(ok, res, err)
     end
     if f.flush then
-        local ok, res, err = pcall(function() return f:flush() end)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        local ok, res, err = pcall(f.flush, f)
+        return _sim_pcall_result(ok, res, err)
     end
     return 1
 end
-local function _sim_close(f)
+function _sim_close(f)
     if not f then return 0 end
     if closefile then
         local ok, res, err = pcall(closefile, f)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        return _sim_pcall_result(ok, res, err)
     end
     if f.close then
-        local ok, res, err = pcall(function() return f:close() end)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        local ok, res, err = pcall(f.close, f)
+        return _sim_pcall_result(ok, res, err)
     end
     return 0
 end
-local function _sim_read(f, mode)
+function _sim_read(f, mode)
     if not f then return nil end
     if read then return read(f, mode) end
     if f.read then return f:read(mode) end
     return nil
 end
-local function _sim_write(f, str)
+function _sim_write(f, str)
     if not f or not str then return 0 end
     if write then
         local ok, res, err = pcall(write, f, str)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        return _sim_pcall_result(ok, res, err)
     end
     if f.write then
-        local ok, res, err = pcall(function() return f:write(str) end)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        local ok, res, err = pcall(f.write, f, str)
+        return _sim_pcall_result(ok, res, err)
     end
     return 0
 end
 -- Helper function for atomic file rename
 -- On Linux / POSIX game server (GLIBC), rename(2) is guaranteed atomic and replaces existing destination files
 -- on the same filesystem without requiring pre-deletion. renamefile in JX1 C-engine maps directly to this syscall.
-local function _sim_rename(oldp, newp)
+function _sim_rename(oldp, newp)
     if renamefile then
         local ok, res, err = pcall(renamefile, oldp, newp)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        return _sim_pcall_result(ok, res, err)
     end
     if os and os.rename then
         local ok, res, err = pcall(os.rename, oldp, newp)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        return _sim_pcall_result(ok, res, err)
     end
     return 0
 end
@@ -1580,19 +1614,17 @@ SimProgression.SKILL_ATTACK_RADIUS = {
     [1731] = 180,
 }
 
-function SimProgression:GetSkillAttackRadius(skillId)
-    if not skillId then return 90 end
-    return self.SKILL_ATTACK_RADIUS[skillId] or 90
-end
-
-function SimProgression:GetSkillAttackRadiusTiles(skillId)
-    local px = self:GetSkillAttackRadius(skillId)
-    local tiles = floor(px / 32)
-    if tiles < 1 then tiles = 1 end
-    return tiles
-end
-
 function SimProgression:IsMeleeSkill(skillId)
+    if SimSkillMeta and SimSkillMeta.IsMelee then
+        return SimSkillMeta:IsMelee(skillId)
+    end
+    if SimSkillMeta and SimSkillMeta.Get then
+        local m = SimSkillMeta:Get(skillId)
+        if m and m.melee == 1 then return 1 end
+        return 0
+    end
     local px = self:GetSkillAttackRadius(skillId)
-    return px <= 120
+    if not px then return 0 end
+    if px <= 120 then return 1 end
+    return 0
 end

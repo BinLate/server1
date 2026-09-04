@@ -13,7 +13,7 @@ function IsActive(self, simInstance,tbNpc)
     local scanFightRadius = tbNpc.RADIUS_FIGHT_PLAYER or RADIUS_FIGHT_PLAYER
 
     if GetNpcAroundPlayerList then
-        -- Bot luyen cong (train) active tu XA hon (60 o thay vi 32) -> t·ªõi gan la da grind san, do delay
+        -- Bot luyen cong (train) active tu XA hon (60 o thay vi 32) -> t?i gan la da grind san, do delay
         -- "lai gan moi active". Bot khac giu 32 (tranh ton CPU toan map thanh thi nhieu bot).
         local actScanR = (tbNpc.mode == "train") and 60 or 32
         local allNpcs, nCount = GetNpcAroundPlayerList(tbNpc.finalIndex, actScanR)
@@ -34,11 +34,12 @@ function IsActive(self, simInstance,tbNpc)
             end
 
             -- Is this player an enemy?
+            -- Peaceful train (camp0): never proximity-aggro. DoSat camp5: may aggro. Else SIMBOT_AGGRO_PLAYER.
             if tbNpc.lastPos 
                 and tbNpc.camp ~= 0
                 and IsAttackableCamp(camp, tbNpc.camp) == 1
                 and GetDistanceRadius(tbNpc.lastPos.nX32/32, tbNpc.lastPos.nY32/32, pX, pY) <= scanFightRadius
-                and (SIMBOT_AGGRO_PLAYER == 1 or tbNpc.mode == "train")   -- [2026-06-28] train bot proximity-aggro player toi gan (thanh/thon van peace)   -- [2026-06-25] BO GetFightState: bot CHI danh tra khi BI DANH (self-def line duoi), KHONG aggro chi vi player o fight-mode danh con KHAC   -- [2026-06-20] SIMBOT_AGGRO_PLAYER=1: bot NHAM+danh player khac camp du player CHUA bat chien dau 
+                and (tbNpc.camp == 5 or (SIMBOT_AGGRO_PLAYER == 1 and tbNpc.mode ~= "train"))
                  then
                 tbNpc.isPlayerEnemyAround = pID
             end
@@ -219,7 +220,10 @@ SimMovement.KeoXe = {
                 tbNpc.isPlayerFighting = isPlayerFighting
 
                 if tbNpc.mode ~= "tieuthiep" then
-                    if isPlayerFighting == 1 then
+                    -- Train/TK/attackable bots MUST stay kind=0 so players can PK them
+                    if tbNpc.mode == "train" or tbNpc.tongkim == 1 or tbNpc.isAttackable == 1 then
+                        SetNpcKind(tbNpc.finalIndex, 0)
+                    elseif isPlayerFighting == 1 then
                         SetNpcKind(tbNpc.finalIndex, tbNpc.kind or 4)
                     else
                         SetNpcKind(tbNpc.finalIndex, 0)
@@ -897,11 +901,14 @@ SimMovement.Citizen = {
 
             -- [2026-06-20] Combat: DUOI npc dich gan nhat bang NpcRun -> 2 bot danh nhau di chuyen muot nhu player. KHONG duoi player (de bot danh NHAU soi noi, ko bu theo nguoi choi). Player van bi cast skill khi lai gan (sim.fight uu tien player). Throttle 1/4.
             tbNpc.chaseN = (tbNpc.chaseN or 0) + 1
-            if tbNpc.chaseN >= 10 then
+            local chaseEvery = 10
+            if tbNpc.mode == "train" then chaseEvery = 3 end
+            if tbNpc.chaseN >= chaseEvery then
                 tbNpc.chaseN = 0
                 local _e = tbNpc.fightSys:IsNpcEnemyAround(simInstance, tbNpc)
                 local _tx, _ty
                 if _e and _e > 0 then
+                    tbNpc.foundNpcEnemy = _e
                     local _ex, _ey = GetNpcPos(_e); _tx = floor(_ex/32); _ty = floor(_ey/32)
                 elseif tbNpc.isPlayerEnemyAround and tbNpc.isPlayerEnemyAround > 0 then  -- [2026-06-23] ko co NPC dich -> BAM THEO player
                     local _pw, _px, _py = CallPlayerFunction(tbNpc.isPlayerEnemyAround, GetWorldPos)
@@ -918,11 +925,26 @@ SimMovement.Citizen = {
                 return tbNpc.fightSys:LeaveFight(simInstance, tbNpc, 0, "toi gio thay doi trang thai")
             end
 
-            -- Case 2: tu dong thoat danh khi khong con ai
+            -- Case 2: train/outdoor keep AI fight (goc); thanhthi may LeaveFight
             if tbNpc.fightSys:CanLeaveFight(simInstance, tbNpc) == 1 then
-                return 1
+                local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+                if tbNpc.mode == "train" or outdoorOk then
+                    -- goc: return without LeaveFight so engine AI keeps hunting
+                else
+                    return tbNpc.fightSys:LeaveFight(simInstance, tbNpc, 0, "khong tim thay quai")
+                end
             end
  
+            -- Train/outdoor: keep casting while fighting
+            local outdoorCast = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+            if (tbNpc.mode == "train" or outdoorCast) and tbNpc.fightSys and tbNpc.fightSys.Update then
+                local _e2 = tbNpc.fightSys:IsNpcEnemyAround(simInstance, tbNpc)
+                if _e2 and _e2 > 0 then
+                    tbNpc.foundNpcEnemy = _e2
+                    tbNpc.fightSys:Update(simInstance, tbNpc)
+                end
+            end
+
             return 1 
         end
 
@@ -931,7 +953,7 @@ SimMovement.Citizen = {
         if ((SimCityCanFight(tbNpc) == 1) and   -- [2026-06-26] BO 'or selfDefTick': SimCityCanFight da lo self-def NGOAI thanh (1) + HOA BINH trong thanh (0); bypass cu -> tu ve trong thanh -> cascade
             (tbNpc.isFighting == 0 and tbNpc.tick_canswitch < tbNpc.tick_breath)) then
             
-            if (tbNpc.isAttractionAround == 0)then
+            if (tbNpc.isAttractionAround == 0 or tbNpc.mode == "train") then
                 -- [2026-06-23] UU TIEN PLAYER: ~25% bot gan player khac camp nham PLAYER truoc (con lai danh NPC nhu cu)
                 if tbNpc.isPlayerEnemyAround and tbNpc.isPlayerEnemyAround > 0 and random(1, 100) <= (CHANCE_PREFER_PLAYER or 25) then
                     if tbNpc.fightSys:TriggerFightWithPlayer(simInstance, tbNpc) == 1 then return 1 end
@@ -954,22 +976,28 @@ SimMovement.Citizen = {
                     end
                 end
 
-                -- Case 3: I auto switch to fight  mode
+                -- Case 3: train/outdoor try scan first, else JoinFight like goc when CHANCE_ATTACK_NPC > 1
                 if (tbNpc.CHANCE_ATTACK_NPC and random(1, tbNpc.CHANCE_ATTACK_NPC) <= 2) then
-                    -- CHo nhung dua chung quanh
-
                     local countFighting = tbNpc.fightSys:GetFightingNPCs(simInstance, tbNpc, myPosX, myPosY)
+                    local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
 
-                    -- If someone is around or I am not crazy then I fight
-                    if countFighting > 0 or tbNpc.CHANCE_ATTACK_NPC > 1 then
+                    if tbNpc.mode == "train" or outdoorOk then
+                        if tbNpc.fightSys:TriggerFightWithNPC(simInstance, tbNpc) == 1 then
+                            return 1
+                        end
+                        if countFighting > 0 or tbNpc.CHANCE_ATTACK_NPC > 1 then
+                            countFighting = countFighting + 1
+                            tbNpc.fightSys:JoinFight(simInstance, tbNpc, "I start a fight")
+                        end
+                    elseif countFighting > 0 or tbNpc.CHANCE_ATTACK_NPC > 1 then
                         countFighting = countFighting + 1
                         tbNpc.fightSys:JoinFight(simInstance, tbNpc, "I start a fight")
                     end
 
                     if countFighting > 0 and tbNpc.worldInfo.showFightingArea == 1 then
                         Msg2Map(nW,
-                            "C„ " .. countFighting .. " nh©n s‹ Æang Æ∏nh nhau tπi " .. tbNpc.worldInfo.name ..
-                            " <color=yellow>" .. floor(myPosX / 8) .. " " .. floor(myPosY / 16) .. "<color>")
+                            "C? " .. countFighting .. " nh?n s? ?ang ??nh nhau t?i " .. tbNpc.worldInfo.name ..
+                            " <color=yellow>" .. floor(myPosX / 8) .. " " .. floor(myPosY / 16) .. "</color>")
                     end
 
                     if (countFighting > 0) then

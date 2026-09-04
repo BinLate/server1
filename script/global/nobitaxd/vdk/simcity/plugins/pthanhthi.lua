@@ -362,8 +362,10 @@ function SimCityThanhThi:mainMenu()
 		local counter = self:countMap(nW)
 		local tbSay = createTaskSayThanhThi("<enter><enter><color=yellow>Nh©n sè hiÖn t¹i: " .. counter .. "<color>")
 
+		if SimCityLuyenCong and SimCityLuyenCong.mainMenu then
 			tinsert(tbSay, "Luyen Cong - Phan bo Simbot train quai/#SimCityLuyenCong:mainMenu()")
-	tinsert(tbSay, "Thµnh ThÞ - Bè c¸o thiªn h¹/#SimCityThanhThi:thanhthiMenu()")
+		end
+		tinsert(tbSay, "Thµnh ThÞ - Bè c¸o thiªn h¹/#SimCityThanhThi:thanhthiMenu()")
 		tinsert(tbSay, "Ph¸t ®éng Phong Háa Liªn Thµnh/#SimCityThanhThi:moPhongHoaLienThanh()")
 		tinsert(tbSay, "Ph¸t ®éng chiÕn tranh/#SimCityChienTranh:mainMenu()")
 
@@ -434,8 +436,14 @@ function SimCityThanhThi:onPlayerEnterMap()
 	local nW, pX, pY = GetWorldPos()
 	local worldInfo = SimCityWorld:Get(nW)
 	local camp = GetCurCamp()
+	if not worldInfo or not worldInfo.playerTracker then
+		if SimCityWorld:IsTongKimMap(nW) == 1 then
+			SimCityTongKim:onPlayerEnterMap(nW)
+		end
+		return 1
+	end
 	worldInfo.playerTracker[PlayerIndex] = {pX, pY, camp}
-	worldInfo.playerTrackerCount = worldInfo.playerTrackerCount + 1
+	worldInfo.playerTrackerCount = (worldInfo.playerTrackerCount or 0) + 1
 	if self.autoAddThanhThi ~= 1 then
 		return 1
 	end
@@ -445,7 +453,6 @@ function SimCityThanhThi:onPlayerEnterMap()
 		return 1
 	end
 
-	-- Neu la dia diem bao danh thi them vao Trieu Man va Vo Ky
 	if nW == 323 or nW == 324 or nW == 325 then
 		SimCityTongKim:onPlayerEnterMap(nW)
 	end
@@ -459,8 +466,11 @@ end
 function SimCityThanhThi:onPlayerExitMap()
 	local nW, _, _ = GetWorldPos()
 	local worldInfo = SimCityWorld:Get(nW)
+	if not worldInfo or not worldInfo.playerTracker then
+		return 1
+	end
 	worldInfo.playerTracker[PlayerIndex] = nil
-	worldInfo.playerTrackerCount = worldInfo.playerTrackerCount - 1
+	worldInfo.playerTrackerCount = (worldInfo.playerTrackerCount or 1) - 1
  
 	if SimCityWorld:IsTongKimMap(nW) ~= 1 and self.autoAddThanhThi ~= 1 then
 		return 1
@@ -501,6 +511,21 @@ function SimCityThanhThi:createNpcSoCapByMap(worldId)
 
 	local worldInfo = SimCityWorld:Get(nW)
 	if (worldInfo.name ~= "") then
+		-- Dedicated train maps: AOI owns spawn (ASCII-only comments)
+		if LUYENCONG_AUTOADD == 1 and SimCityLuyenCong and SimCityLuyenCong.findMapIndex then
+			local trainIdx = SimCityLuyenCong:findMapIndex(nW)
+			if trainIdx then
+				worldInfo.allowFighting = 1
+				worldInfo.isTrainMap = 1
+				SimCityLuyenCong:spawnForMap(trainIdx)
+				return
+			end
+			if SimCitizen and SimCitizen.ClearMap then
+				SimCitizen:ClearMap(nW, "train")
+			end
+			worldInfo.isTrainMap = 0
+		end
+
 		local tmpFound = {}
 		local level
 		local total = 100
@@ -592,10 +617,11 @@ function SimCityThanhThi:createNpcSoCapByMap(worldId)
 			end
 		elseif map9x == 0 then
 			if isThanhThi then
-			worldInfo.allowFighting = 0
-			worldInfo.cityPeace = 1
-			--else
-			--	worldInfo.allowFighting = 1
+				worldInfo.allowFighting = 0
+				worldInfo.cityPeace = 1
+			else
+				worldInfo.allowFighting = 1
+				worldInfo.cityPeace = 0
 			end
 			
 			-- Split into 4 tables of 50 NPCs each
@@ -659,24 +685,14 @@ function SimCityThanhThi:createNpcSoCapByMap(worldId)
 				table5				
 			})			
 			if isThanhThi then
-				--self.patrolMap = nW
-				--self.patrolTimerId = AddTimer(20 * 18, "SimCityThanhThi:CreatePatrol", self)
-			end 
-		elseif LUYENCONG_AUTOADD == 1 then
-			tmpFound = nv9x
-			N = getn(tmpFound)
-			worldInfo.allowFighting = 1
-			worldInfo.isTrainMap = 1   
-			total = 10
-			local everything = {}
-			local _spNodes = {}  
-			for _k, _v in worldInfo.nodes do
-				if _v.x and _v.y and _v.nodeType == 1 then tinsert(_spNodes, {_v.x, _v.y}) end   
+				worldInfo.allowFighting = 0
+				worldInfo.cityPeace = 1
+			else
+				worldInfo.allowFighting = 1
+				worldInfo.cityPeace = 0
 			end
 			local _spN = getn(_spNodes)
 			local _picked = {}
-			local savedBots = (SimProgression and SimProgression.LoadTrainBots and SimProgression:LoadTrainBots(nW)) or {}
-			local hasSaved = (savedBots and getn(savedBots) > 0)
 			for i = 1, total do
 				local id = tmpFound[random(1, N)]
 				local grpCamp = i - (floor((i - 1) / 4) * 4)   
@@ -694,30 +710,21 @@ function SimCityThanhThi:createNpcSoCapByMap(worldId)
 					end
 					if _best then tinsert(_picked, _best); _gx = _best[1]*32; _gy = _best[2]*32 end
 				end
-				local botSavedData = hasSaved and savedBots[i]
-				local botLv = (botSavedData and botSavedData.level) or 1
-				local botExp = (botSavedData and botSavedData.nExp) or 0
-				local botName = (botSavedData and botSavedData.szName) or SimCityNPCInfo:generateName()
-				local botFaction = (botSavedData and botSavedData.faction) or nil
 				local children5 = {}
 				for j = 1, random(6, 7) do  
 					tinsert(children5, {
 						mode = "train",
 						camp = grpCamp,   
 						szName = SimCityNPCInfo:generateName(),
-						nNpcId = tmpFound[random(1, N)],
-						level = botLv,
-						nExp = 0
+						nNpcId = tmpFound[random(1, N)], 
 					})
 				end
 				tinsert(everything, {{id, nW,
 					{
-						szName = botName,
+						szName = SimCityNPCInfo:generateName(),
 						ngoaitrang = 1,
 						mode = "train",
-						level = botLv,
-						nExp = botExp,
-						faction = botFaction,
+						level = level or 95,
 						capHP = 1,
 						camp = grpCamp,   
 						goX32 = _gx, goY32 = _gy,   

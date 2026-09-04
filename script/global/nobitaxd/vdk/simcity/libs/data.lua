@@ -14,7 +14,7 @@ SimCityPhai = {
 -- Doc ten
 function loadNames()
     local namesData = SimCityTableFromFile(settingsPath.. "names.txt", {"*w"})
-    if namesData then
+    if namesData and getn(namesData) > 0 then
         for i=1, getn(namesData) do
             local _n = namesData[i][1]
             if _n and _n ~= "" and _n ~= "Name" then
@@ -122,32 +122,35 @@ function loadMap()
             for i=1, getn(foundWalkPath) do
                 
                 local col = foundWalkPath[i]
-                local nodeName = col[1]
+                local nodeName = SimCityTrimCell(col[1])
 
                 local x, y = nodeNameToCoords(nodeName)
-                if i == 1 then
-                    world.firstNode = {x, y}
-                end
-                local linkedNodes = split(col[2], ",")
-                local isExact = col[3]
-                local nodeType = col[4]
-                
-                allNodes[nodeName] = {
-                    x = x,
-                    y = y,
-                    linkedNodes = linkedNodes, 
-                    isExact = isExact, 
-                    nodeType = nodeType, -- 0: normal, 1: war
-                    isNearAtraction = 0,
-                    isNotPreset = 1
-                }
+                -- Never insert a node without numeric coords (graph poison -> crash)
+                if x ~= nil and y ~= nil then
+                    if i == 1 or world.firstNode == nil then
+                        world.firstNode = {x, y}
+                    end
+                    local linkedNodes = split(col[2], ",")
+                    local isExact = col[3]
+                    local nodeType = col[4]
+                    
+                    allNodes[nodeName] = {
+                        x = x,
+                        y = y,
+                        linkedNodes = linkedNodes, 
+                        isExact = isExact, 
+                        nodeType = nodeType, -- 0: normal, 1: war
+                        isNearAtraction = 0,
+                        isNotPreset = 1
+                    }
 
-                if mapAtractions[worldId] then
-                    for j=1, getn(mapAtractions[worldId]) do
-                        local atraction = mapAtractions[worldId][j]
-                        if GetDistanceRadius(x, y, atraction[1], atraction[2]) < 8 then
-                            allNodes[nodeName].isNearAtraction = atraction[3]
-                            break
+                    if mapAtractions[worldId] then
+                        for j=1, getn(mapAtractions[worldId]) do
+                            local atraction = mapAtractions[worldId][j]
+                            if GetDistanceRadius(x, y, atraction[1], atraction[2]) < 8 then
+                                allNodes[nodeName].isNearAtraction = atraction[3]
+                                break
+                            end
                         end
                     end
                 end
@@ -161,7 +164,7 @@ function loadMap()
                 end
             end
             world.attractionNodes = anodes
-            -- Da Tau: tim toa do Da Tau (match mo ta) -> daTauNodes (node quanh do <10 o) cho stall tu tap dong.
+            -- Da Tau: tim toa do Da Tau (match mo ta) -> daTauNodes
             local _dtx, _dty
             if mapAtractions[worldId] then
                 for j=1, getn(mapAtractions[worldId]) do
@@ -191,10 +194,10 @@ function loadMap()
         if fileType == "preset" then
             local foundWalkMap = SimCityTableFromFile(mapPath.. filePath, {"*w", "*w"})
 
-            allPaths = {}
+            local allPaths = {}
             for i=1, getn(foundWalkMap) do
                 local pathName = foundWalkMap[i][1]
-                local nodeName = foundWalkMap[i][2]
+                local nodeName = SimCityTrimCell(foundWalkMap[i][2])
 
                 if not allPaths[pathName] then
                     allPaths[pathName] = {}
@@ -227,9 +230,12 @@ function loadMap()
         local entry = haudoanhData[i]
         local worldId = entry[1]
         local campName = entry[2]
-        local nodeName = entry[3]
+        local nodeName = SimCityTrimCell(entry[3])
 
         if SimCityMap[worldId] then
+            if not SimCityMap[worldId].presetPaths then
+                SimCityMap[worldId].presetPaths = {}
+            end
             if not SimCityMap[worldId].presetPaths[campName] then
                 SimCityMap[worldId].presetPaths[campName] = {}
             end
@@ -237,65 +243,65 @@ function loadMap()
         end
     end
 
-    -- Final touch, for those missing node definition in preset paths
+    -- Final touch: same flow as server1-goc, but never insert nil x/y nodes
     for worldId, world in SimCityMap do
         if world.presetPaths then
+            if not world.nodes then
+                world.nodes = {}
+            end
             for presetName, preset in world.presetPaths do
                 for i=1, getn(preset) do
                     local nodeName = preset[i]
                     if not world.nodes[nodeName] then
                         local x, y = nodeNameToCoords(nodeName)
+                        if x ~= nil and y ~= nil then
 
-                        -- Try to snap to existing nodes within 16 radius
-                        local snappedNode = nil
-                        local minDist = 8
-                        for existingNode, nodeData in world.nodes do
-                            local dist = GetDistanceRadius(x, y, nodeData.x, nodeData.y)
-                            if dist <= minDist then
-                                snappedNode = existingNode
-                                minDist = dist
+                            local snappedNode = nil
+                            local minDist = 8
+                            for existingNode, nodeData in world.nodes do
+                                if nodeData and nodeData.x ~= nil and nodeData.y ~= nil then
+                                    local dist = GetDistanceRadius(x, y, nodeData.x, nodeData.y)
+                                    if dist <= minDist then
+                                        snappedNode = existingNode
+                                        minDist = dist
+                                    end
+                                end
                             end
-                        end
 
-                        -- Replace current preset node with snapped node if found
-                        local testNode = nodeName
-                        if snappedNode then
-                            testNode = snappedNode
-                        end
+                            local testNode = nodeName
+                            if snappedNode then
+                                testNode = snappedNode
+                            end
 
-                        if world.nodes[testNode] and world.nodes[testNode].isNotPreset == 1 then
-                            preset[i] = testNode
-                        else
-                            world.nodes[nodeName] = {
-                                nodeType = 1,
-                                x = x,
-                                y = y,
-                                linkedNodes = {},
-                                isExact = 0,
-                                isNearAtraction = 0,
-                                isNotPreset = 0
-                            }
-                        
-                            -- Find linked nodes within 16 radius
-                            for otherNodeName, otherNode in world.nodes do
-                                if otherNodeName ~= testNode and otherNodeName ~= nodeName then
-                                    local dx = otherNode.x - world.nodes[testNode].x
-                                    local dy = otherNode.y - world.nodes[testNode].y
-                                    
-                                    if GetDistanceRadius(x, y, otherNode.x, otherNode.y) <= 16 then
-                                        tinsert(world.nodes[nodeName].linkedNodes, otherNodeName)
-                                        
-                                        -- Add this node to the other node's linkedNodes that other was not preset
-                                        local found = 0
-                                        if otherNode.isNotPreset == 0 then
-                                            for j=1, getn(otherNode.linkedNodes) do
-                                                if otherNode.linkedNodes[j] == nodeName then
-                                                    found = 1
-                                                    break
+                            if world.nodes[testNode] and world.nodes[testNode].isNotPreset == 1 then
+                                preset[i] = testNode
+                            else
+                                world.nodes[nodeName] = {
+                                    nodeType = 1,
+                                    x = x,
+                                    y = y,
+                                    linkedNodes = {},
+                                    isExact = 0,
+                                    isNearAtraction = 0,
+                                    isNotPreset = 0
+                                }
+
+                                for otherNodeName, otherNode in world.nodes do
+                                    if otherNodeName ~= testNode and otherNodeName ~= nodeName and otherNode and otherNode.x ~= nil and otherNode.y ~= nil then
+                                        if GetDistanceRadius(x, y, otherNode.x, otherNode.y) <= 16 then
+                                            tinsert(world.nodes[nodeName].linkedNodes, otherNodeName)
+
+                                            local found = 0
+                                            if otherNode.isNotPreset == 0 then
+                                                for j=1, getn(otherNode.linkedNodes) do
+                                                    if otherNode.linkedNodes[j] == nodeName then
+                                                        found = 1
+                                                        break
+                                                    end
                                                 end
-                                            end
-                                            if found == 0 then
-                                                tinsert(otherNode.linkedNodes, nodeName)
+                                                if found == 0 then
+                                                    tinsert(otherNode.linkedNodes, nodeName)
+                                                end
                                             end
                                         end
                                     end

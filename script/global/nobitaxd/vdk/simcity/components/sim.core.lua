@@ -1,5 +1,6 @@
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\config.lua")
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\libs\\index.lua")
+Include("\\script\\global\\nobitaxd\\vdk\\simcity\\components\\sim.skill_meta.lua")
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\components\\sim.movement.lua")
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\components\\sim.fun.lua")
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\components\\sim.entity.lua")
@@ -26,14 +27,25 @@ function SimCore:initCharConfig(config)
     config.tick_canWalk = 0
     config.tick_canswitch = 0
     config.tick_canCast = 0
-    config.camp = config.camp or random(1, 3)
+    config.camp = config.camp or 1
     config.noRevive = config.noRevive or 0   
     config.fightingScore = 0
     config.rank = 1
     config.ngoaitrang = config.ngoaitrang or 0
     config.capHP = config.capHP or 1
     config.level = config.level or 95
-    config.isAttackable = config.isAttackable or 0
+    -- Combat train / TK bots are player-attackable; stalls stay protected (isAttackable=0)
+    if config.isAttackable == nil then
+        if config.mode == "train" or config.tongkim == 1 then
+            config.isAttackable = 1
+        else
+            config.isAttackable = 0
+        end
+    end
+    -- Player-like kind for PK targeting (sevencity: kind!=0 = unattackable NPC mode)
+    if config.mode == "train" or config.tongkim == 1 then
+        config.kind = 0
+    end
     if config.capHP and config.capHP ~= "auto" then
         config.maxHP = random(SIMBOT_HP_MIN or 60000, SIMBOT_HP_MAX or 120000)  
     end
@@ -152,13 +164,16 @@ function SimCore:initCharConfig(config)
                     SimProgression:UpdateBotSkills(config)
                 else
                     config.skillCastBua = {_p[1], 20}
-                    if config.faction == "duongmon" then config.skill351 = 351 end                  
-                    if SimBotDebuff[config.faction] then config.skillDebuffList = SimBotDebuff[config.faction] end
                 end
             end
 
     end
    
+    -- Camp theo phe mon phai (vang/xanh/tim) — sau khi da co faction
+    if ApplySimBotFactionCamp then
+        ApplySimBotFactionCamp(config)
+    end
+
     if config.series == 0 then
         config.nSettingsIdx = -1
     elseif config.series == 2 then
@@ -233,32 +248,30 @@ function SimCore:OnDeath(nListId, nNpcIndex, attackerIndex)
 end
 
 
-SIMBOT_MELEE_SKILLS = {[318]=1,[319]=1,[322]=1,[323]=1,[325]=1,[361]=1,[368]=1}
-SIMBOT_DISMOUNT_SKILLS = {[318]=1,[319]=1,[323]=1,[325]=1,[328]=1,[380]=1,[336]=1,[337]=1,[339]=1,[342]=1,[351]=1,[353]=1,[357]=1,[359]=1,[362]=1,[365]=1,[368]=1,[372]=1,[375]=1}
+-- Authoritative combat meta: SimSkillMeta (tools/gen_skill_meta.py).
+-- Legacy multi-table horse/range lists removed (ALLOWLIST / DEFAULT-DENY).
+SIMBOT_MELEE_SKILLS = {[318]=1,[319]=1,[322]=1,[323]=1,[325]=1,[361]=1,[368]=1} -- hint only; runtime uses SimSkillMeta
+SIMBOT_DISMOUNT_SKILLS = nil -- removed; use SimSkillMeta:CanCastOnHorse == 0
 SIM_DIR8X = {1, 1, 0, -1, -1, -1, 0, 1}   
 SIM_DIR8Y = {0, 1, 1, 1, 0, -1, -1, -1}
 SIMBOT_RANGED_DIST = 12  
 SIMBOT_MELEE_DIST  = 2  
-SIMBOT_SKILL_RANGE = {  
-    [318]=2,[319]=2,[321]=12,                  -- thieulam
-    [322]=2,[323]=2,[325]=2,                   -- thienvuong (3 melee)
-    [339]=11,[342]=11,[302]=14,[351]=1,        -- duongmon (351 bom dat phu tro)
-    [353]=13,[355]=5,[72]=13,[73]=13,[390]=13, -- ngudoc (chinh + debuff)
-    [328]=11,[380]=12,                         -- ngami
-    [336]=11,[337]=7,                          -- thuyyen
-    [357]=12,[359]=12,                         -- caibang
-    [361]=1,[362]=13,                          -- thiennhan
-    [365]=14,[368]=2,                          -- vodang
-    [372]=12,[375]=14,                         -- conlon
-}
-function SimBotCastDist(tbNpc)
-    local s = tbNpc.skillCastBua and tbNpc.skillCastBua[1]
-    if s and SimProgression and SimProgression.GetSkillAttackRadiusTiles then
-        return SimProgression:GetSkillAttackRadiusTiles(s)
+SIMBOT_SKILL_RANGE = nil -- removed; use SimSkillMeta:GetAttackRadiusTiles
+function SimBotCastDist(tbNpc, skillId)
+    local sid = skillId
+    if not sid and tbNpc then
+        sid = tbNpc.pendingSkillId or (tbNpc.skillCastBua and tbNpc.skillCastBua[1])
     end
-    if s and SIMBOT_SKILL_RANGE[s] then return SIMBOT_SKILL_RANGE[s] end   
-    if s and SIMBOT_MELEE_SKILLS[s] then return SIMBOT_MELEE_DIST end
-    return SIMBOT_RANGED_DIST
+    if sid and SimSkillMeta and SimSkillMeta.GetAttackRadiusTiles then
+        local t = SimSkillMeta:GetAttackRadiusTiles(sid)
+        if t and t > 0 then return t end
+    end
+    if sid and SimProgression and SimProgression.GetSkillAttackRadiusTiles then
+        local t = SimProgression:GetSkillAttackRadiusTiles(sid)
+        if t and t > 0 then return t end
+    end
+    -- Unknown skill: force close approach (never invent long range)
+    return SIMBOT_MELEE_DIST
 end
 
 function SimPickSkill(tbNpc, noDebuff)   
@@ -271,22 +284,86 @@ function SimPickSkill(tbNpc, noDebuff)
         if tbNpc.debuffIdx <= getn(tbNpc.skillDebuffList) then
             local id = tbNpc.skillDebuffList[tbNpc.debuffIdx]
             tbNpc.debuffIdx = tbNpc.debuffIdx + 1
-            return {id, 20}
+            local sk = {id, 20}
+            tbNpc.pendingSkill = sk
+            tbNpc.pendingSkillId = id
+            return sk
         end
     end
    
     if tbNpc.skill351 and random(1, 100) <= 40 then
-        return {tbNpc.skill351, 20}
+        local sk = {tbNpc.skill351, 20}
+        tbNpc.pendingSkill = sk
+        tbNpc.pendingSkillId = tbNpc.skill351
+        return sk
     end
-    local sk = tbNpc.skillCastBua  
-    if tbNpc.skillCastBua2 then   
-        if tbNpc.bua2Toggle then sk = tbNpc.skillCastBua2 end   
-        tbNpc.bua2Toggle = not tbNpc.bua2Toggle                
+
+    -- Prefer horse-allowlisted skill while mounted (peek; do not flip bua2 yet).
+    -- If none allowlisted, keep pending foot skill -> SimApplyHorseCombat will dismount.
+    local riding = 0
+    if GetNpcRideHorse and tbNpc.finalIndex and tbNpc.finalIndex > 0 then
+        riding = GetNpcRideHorse(tbNpc.finalIndex) or 0
+    elseif tbNpc.isCurrentlyRiding == 1 then
+        riding = 1
+    end
+
+    local sk = tbNpc.skillCastBua
+    if tbNpc.skillCastBua2 and tbNpc.bua2Toggle then
+        sk = tbNpc.skillCastBua2
     end
     if not sk and tbNpc.faction and SimCityPhai[tbNpc.faction] and SimCityPhai[tbNpc.faction].normalCast and getn(SimCityPhai[tbNpc.faction].normalCast) > 0 then
         sk = SimCityPhai[tbNpc.faction].normalCast[random(1, getn(SimCityPhai[tbNpc.faction].normalCast))]
     end
+
+    if riding == 1 and SimSkillMeta and SimSkillMeta.CanCastOnHorse and sk and sk[1] then
+        if SimSkillMeta:CanCastOnHorse(sk[1]) ~= 1 then
+            local candidates = {}
+            if tbNpc.skillCastBua and tbNpc.skillCastBua[1] and SimSkillMeta:CanCastOnHorse(tbNpc.skillCastBua[1]) == 1 then
+                tinsert(candidates, tbNpc.skillCastBua)
+            end
+            if tbNpc.skillCastBua2 and tbNpc.skillCastBua2[1] and SimSkillMeta:CanCastOnHorse(tbNpc.skillCastBua2[1]) == 1 then
+                tinsert(candidates, tbNpc.skillCastBua2)
+            end
+            if getn(candidates) > 0 then
+                sk = candidates[random(1, getn(candidates))]
+            end
+            -- else keep foot skill; horse timer + SimApplyHorseCombat dismount
+        end
+    end
+
+    if sk and sk[1] then
+        tbNpc.pendingSkill = sk
+        tbNpc.pendingSkillId = sk[1]
+    end
     return sk
+end
+
+function SimCommitSkillToggle(tbNpc)
+    if tbNpc and tbNpc.skillCastBua2 then
+        tbNpc.bua2Toggle = not tbNpc.bua2Toggle
+    end
+end
+
+function SimEnsureCombatAttackable(tbNpc)
+    if not tbNpc or not tbNpc.finalIndex or tbNpc.finalIndex <= 0 then return end
+    if tbNpc.mode ~= "train" and tbNpc.tongkim ~= 1 and tbNpc.isAttackable ~= 1 then return end
+    if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
+    -- Keep faction camp stable (do not fight duel/party temporary camps)
+    if tbNpc.tongkim ~= 1 and tbNpc.mode == "train"
+       and not tbNpc.duelPlayerId and not tbNpc.partyPlayerId and not tbNpc.partyHuntCamp then
+        if GetFactionCamp and not tbNpc.factionHomeCamp then
+            tbNpc.factionHomeCamp = GetFactionCamp(tbNpc.faction)
+        end
+        if tbNpc.camp == 5 or tbNpc.isDoSat == 1 then
+            tbNpc.camp = 5
+            tbNpc.isDoSat = 1
+        elseif (tbNpc.level or 1) < 10 then
+            tbNpc.camp = 0
+        elseif tbNpc.factionHomeCamp then
+            tbNpc.camp = tbNpc.factionHomeCamp
+        end
+    end
+    if SetNpcCurCamp and tbNpc.camp ~= nil then SetNpcCurCamp(tbNpc.finalIndex, tbNpc.camp) end
 end
 
 function SimDuelEnd(tbNpc)
@@ -442,7 +519,7 @@ function SimPartyFollow(simInstance, tbNpc)
             local tY = floor(ty32 / 32)
             if GetDistanceRadius(tX, tY, pX, pY) > 20 then tbNpc.partyTarget = nil  
             else
-                local _cd = SimBotCastDist(tbNpc)
+                local _cd = SimBotCastDist(tbNpc, tbNpc.pendingSkillId)
                 local _td = GetDistanceRadius(myX, myY, tX, tY)
                 if SetNpcLevel and not tbNpc.botLvSet then tbNpc.botLvSet = 1; SetNpcLevel(tbNpc.finalIndex, 95) end
                 
@@ -456,17 +533,20 @@ function SimPartyFollow(simInstance, tbNpc)
                     end
                 end
                 tbNpc.isFighting = 1; tbNpc.botFighting = 1
+                if SimEnsureCombatAttackable then SimEnsureCombatAttackable(tbNpc) end
+                local sk = SimPickSkill(tbNpc)
                 if SetNpcCombat and (not tbNpc.botCombatTick or tbNpc.botCombatTick <= tbNpc.tick_breath) then
-                    SetNpcCombat(tbNpc.finalIndex, 1, tbNpc.skillCastBua and tbNpc.skillCastBua[1] or 0)
+                    SetNpcCombat(tbNpc.finalIndex, 1, (sk and sk[1]) or 0)
                     tbNpc.botCombatTick = tbNpc.tick_breath + 2
                 end
                 SimBotTranPhai(simInstance, tbNpc)                 
+                _cd = SimBotCastDist(tbNpc, sk and sk[1])
                 if _td > _cd and _td < 40 then
                     if BotDuelDisarm and tbNpc.partyArmTick then BotDuelDisarm(tbNpc.finalIndex); tbNpc.partyArmTick = nil end
                     if NpcRun then NpcRun(tbNpc.finalIndex, tX, tY) end
-                elseif _td <= _cd and SimPickSkill and (BotDuelArm or BotDoSkill) and (not tbNpc.partyArmTick or tbNpc.partyArmTick <= tbNpc.tick_breath) then
-                    local sk = SimPickSkill(tbNpc)  
-                    if sk and sk[1] and sk[1] > 0 then
+                elseif _td <= _cd and sk and (BotDuelArm or BotDoSkill) and (not tbNpc.partyArmTick or tbNpc.partyArmTick <= tbNpc.tick_breath) then
+                    if sk[1] and sk[1] > 0 then
+                        if SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
                         if SetNpcLevel then SetNpcLevel(tbNpc.finalIndex, tbNpc.level or 1) end
                         if SetNpcAtkSpeed then SetNpcAtkSpeed(tbNpc.finalIndex, tbNpc.attackSpeed or 100) end
                         tbNpc.partyArmTick = tbNpc.tick_breath + 1
@@ -476,6 +556,7 @@ function SimPartyFollow(simInstance, tbNpc)
                             local _gd = GetNpcDoing and GetNpcDoing(tbNpc.finalIndex) or 1   
                             if _gd ~= 6 and _gd ~= 7 then BotDoSkill(tbNpc.finalIndex, sk[1], sk[2] or 20, _tgt) end
                         end
+                        if SimCommitSkillToggle then SimCommitSkillToggle(tbNpc) end
                     end
                 end
                 return 1
@@ -537,8 +618,10 @@ function SimDuelMove(simInstance, tbNpc)
     local myX = floor(nX32 / 32)
     local myY = floor(nY32 / 32)
     local dist = GetDistanceRadius(myX, myY, pX, pY)
-    local _castDist = SimBotCastDist(tbNpc)     
-    local _melee = (tbNpc.skillCastBua and SIMBOT_MELEE_SKILLS[tbNpc.skillCastBua[1]]) and true or false
+    local pending = SimPickSkill(tbNpc)
+    local pendingId = pending and pending[1]
+    local _castDist = SimBotCastDist(tbNpc, pendingId)
+    local _melee = (pendingId and ((SimSkillMeta and SimSkillMeta:Get(pendingId) and SimSkillMeta:Get(pendingId).melee == 1) or SIMBOT_MELEE_SKILLS[pendingId])) and true or false
     local _hold = _melee and 1 or (_castDist - 2)
     if _hold < 1 then _hold = 1 end
     local _holdMin = _melee and 0 or (_hold - 2)
@@ -552,14 +635,18 @@ function SimDuelMove(simInstance, tbNpc)
 
     local _canFight = (SimCityCanFight and SimCityCanFight(tbNpc) == 1)
     tbNpc.isPlayerEnemyAround = _canFight and pID or 0
+    if SimEnsureCombatAttackable then SimEnsureCombatAttackable(tbNpc) end
    
     if SetNpcCombat and _canFight and (not tbNpc.duelCombatTick or tbNpc.duelCombatTick <= tbNpc.tick_breath) then
-        SetNpcCombat(tbNpc.finalIndex, 1, tbNpc.skillCastBua and tbNpc.skillCastBua[1] or 0)
+        SetNpcCombat(tbNpc.finalIndex, 1, pendingId or 0)
         tbNpc.duelCombatTick = tbNpc.tick_breath + 2
     end
     if tbNpc.selfDefDuel == 1 and _canFight and BotMountSync and BotPlayerMove then
+        if pendingId and SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, pendingId) end
         if not tbNpc.plProto75Tick or tbNpc.plProto75Tick <= tbNpc.tick_breath then
-            BotMountSync(tbNpc.finalIndex, 0)   
+            if pendingId and SimSkillMeta and SimSkillMeta:CanCastOnHorse(pendingId) ~= 1 then
+                BotMountSync(tbNpc.finalIndex, 0)
+            end
             tbNpc.plProto75Tick = tbNpc.tick_breath + 6
         end
         if (not _inBand) and (tbNpc.plLastTX ~= _bandX or tbNpc.plLastTY ~= _bandY) then
@@ -573,8 +660,9 @@ function SimDuelMove(simInstance, tbNpc)
             if GetNpcDoing then local _gd = GetNpcDoing(tbNpc.finalIndex); _notCasting = (_gd ~= 6 and _gd ~= 7) end   
             if (BotDuelArm or BotDoSkill) and PIdx2NpcIdx and _inBand and (not tbNpc.duelArmTick or tbNpc.duelArmTick <= tbNpc.tick_breath) then   
                 
-                local sk = SimPickSkill(tbNpc)  
+                local sk = pending
                 if sk and sk[1] and sk[1] > 0 then
+                    if SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
                     local _tn = PIdx2NpcIdx(pID)
                     if _tn and _tn > 0 then
                         if SetNpcAtkSpeed then SetNpcAtkSpeed(tbNpc.finalIndex, tbNpc.attackSpeed or 100) end  
@@ -586,12 +674,13 @@ function SimDuelMove(simInstance, tbNpc)
                             local _gd = GetNpcDoing and GetNpcDoing(tbNpc.finalIndex) or 1  
                             if _gd ~= 6 and _gd ~= 7 then BotDoSkill(tbNpc.finalIndex, sk[1], sk[2] or 20, _tn) end
                         end
+                        if SimCommitSkillToggle then SimCommitSkillToggle(tbNpc) end
                     end
                 end
             end
      
             if SetNpcCombat and (not tbNpc.duelCombatTick or tbNpc.duelCombatTick <= tbNpc.tick_breath) then
-                SetNpcCombat(tbNpc.finalIndex, 1, tbNpc.skillCastBua and tbNpc.skillCastBua[1] or 0)
+                SetNpcCombat(tbNpc.finalIndex, 1, pendingId or 0)
                 tbNpc.duelCombatTick = tbNpc.tick_breath + 2
             end
     
@@ -672,11 +761,13 @@ function SimBotDuelMove(simInstance, tbNpc)
     local myX = floor(nx32 / 32)
     local myY = floor(ny32 / 32)
     local dist = GetDistanceRadius(myX, myY, tX, tY)
-    local _castDist = SimBotCastDist(tbNpc)
+    local pending = SimPickSkill(tbNpc, 1)
+    local pendingId = pending and pending[1]
+    local _castDist = SimBotCastDist(tbNpc, pendingId)
     if SetNpcLevel and not tbNpc.botLvSet then tbNpc.botLvSet = 1; SetNpcLevel(tbNpc.finalIndex, 95) end  
     tbNpc.isFighting = 1; tbNpc.botFighting = 1   
     if SetNpcCombat and (not tbNpc.botCombatTick or tbNpc.botCombatTick <= tbNpc.tick_breath) then
-        SetNpcCombat(tbNpc.finalIndex, 1, tbNpc.skillCastBua and tbNpc.skillCastBua[1] or 0)   
+        SetNpcCombat(tbNpc.finalIndex, 1, pendingId or (tbNpc.skillCastBua and tbNpc.skillCastBua[1]) or 0)   
         tbNpc.botCombatTick = tbNpc.tick_breath + 2
     end
     SimBotTranPhai(simInstance, tbNpc)       
@@ -686,7 +777,12 @@ function SimBotDuelMove(simInstance, tbNpc)
         SetNpcAuraSkill(tbNpc.finalIndex, SimCityPhai["ngudoc"].noCast[tbNpc.skillHoTro][1], 1)
     end
     
-    local _meleeBV = (tbNpc.skillCastBua and SIMBOT_MELEE_SKILLS and SIMBOT_MELEE_SKILLS[tbNpc.skillCastBua[1]]) and true or false
+    local _meleeBV = false
+    if pendingId and SimSkillMeta and SimSkillMeta.IsMelee then
+        _meleeBV = (SimSkillMeta:IsMelee(pendingId) == 1)
+    elseif pendingId and SIMBOT_MELEE_SKILLS and SIMBOT_MELEE_SKILLS[pendingId] then
+        _meleeBV = true
+    end
     local _holdBV = _meleeBV and 1 or (_castDist - 2)
     if _holdBV < 1 then _holdBV = 1 end
     local _holdMinBV = _meleeBV and 0 or (_holdBV - 2)
@@ -701,15 +797,26 @@ function SimBotDuelMove(simInstance, tbNpc)
             NpcRun(tbNpc.finalIndex, _bx, _by)
         end
     end    
-    if _inBandBV and NpcCastSkill and SimPickSkill and (not tbNpc.botCastTick or tbNpc.botCastTick <= tbNpc.tick_breath) then
-        local sk = SimPickSkill(tbNpc, 1)  
-        if sk and sk[1] and sk[1] > 0 then
-            if SetNpcLevel then SetNpcLevel(tbNpc.finalIndex, tbNpc.level or 1) end   
-            if SetNpcAtkSpeed then SetNpcAtkSpeed(tbNpc.finalIndex, tbNpc.attackSpeed or 100) end
-            local _gd = GetNpcDoing and GetNpcDoing(tbNpc.finalIndex) or 1   
-            if _gd ~= 6 and _gd ~= 7 and BotDoSkill then BotDoSkill(tbNpc.finalIndex, sk[1], sk[2] or 20, tIdx) end  
-            tbNpc.botCastTick = tbNpc.tick_breath + 1   
+    if _inBandBV and pending and pending[1] and pending[1] > 0 and (not tbNpc.botCastTick or tbNpc.botCastTick <= tbNpc.tick_breath) then
+        local sk = pending
+        if SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
+        if SimSkillMeta and SimSkillMeta:CanCastOnHorse(sk[1]) ~= 1 then
+            local stillRide = 0
+            if GetNpcRideHorse then stillRide = GetNpcRideHorse(tbNpc.finalIndex) or 0 end
+            if stillRide == 1 or tbNpc.isCurrentlyRiding == 1 then
+                if SetNpcRideHorse then SetNpcRideHorse(tbNpc.finalIndex, 0) end
+                if BotMountSync then BotMountSync(tbNpc.finalIndex, 0) end
+                tbNpc.isCurrentlyRiding = 0
+                tbNpc.botCastTick = tbNpc.tick_breath + 1
+                return 1
+            end
         end
+        if SetNpcLevel then SetNpcLevel(tbNpc.finalIndex, tbNpc.level or 1) end   
+        if SetNpcAtkSpeed then SetNpcAtkSpeed(tbNpc.finalIndex, tbNpc.attackSpeed or 100) end
+        local _gd = GetNpcDoing and GetNpcDoing(tbNpc.finalIndex) or 1   
+        if _gd ~= 6 and _gd ~= 7 and BotDoSkill then BotDoSkill(tbNpc.finalIndex, sk[1], sk[2] or 20, tIdx) end
+        if SimCommitSkillToggle then SimCommitSkillToggle(tbNpc) end
+        tbNpc.botCastTick = tbNpc.tick_breath + 1   
     end
     return 1
 end
@@ -808,8 +915,11 @@ function SimCore:OnTimer(tbNpc, rate)
             end
         end
         if (EnforceBotHp) then            
-            EnforceBotHp(tbNpc.finalIndex, 1)          
-            if tbNpc.tongkim ~= 1
+            EnforceBotHp(tbNpc.finalIndex, 1)
+            -- Do not potion-heal while player is PKing this bot (otherwise Do Sat feels impossible)
+            local _underPlayerPk = (tbNpc.duelPlayerId or tbNpc.selfDefDuel == 1
+                or (tbNpc.selfDefTick and tbNpc.selfDefTick > tbNpc.tick_breath)) and 1 or 0
+            if tbNpc.tongkim ~= 1 and _underPlayerPk ~= 1
                and NPCINFO_GetNpcCurrentLife and NPCINFO_GetNpcCurrentMaxLife
                and (not tbNpc.potionTick or tbNpc.potionTick <= tbNpc.tick_breath) then
                 tbNpc.potionTick = tbNpc.tick_breath + 1.5*18/REFRESH_RATE  
@@ -838,28 +948,40 @@ function SimCore:OnTimer(tbNpc, rate)
             SetBotSpeed(tbNpc.finalIndex, 15, 24)  
         end
        
-        if (BotMountSync) then
-            BotMountSync(tbNpc.finalIndex, tbNpc.isFighting or 0)
-        end
-    
         if SetNpcRideHorse and tbNpc.tongkim ~= 1 then
-            local _dmSk = tbNpc.skillCastBua and tbNpc.skillCastBua[1]
-            local _isDm = _dmSk and SIMBOT_DISMOUNT_SKILLS[_dmSk]
+            -- Horse policy: travel mounted; combat horse owned by pendingSkill allowlist
             local _inCbt = (tbNpc.isFighting or 0) == 1 or tbNpc.duelPlayerId or tbNpc.botDuelTarget
-            local _wantRide = (_inCbt and _isDm) and 0 or 1  
-           
-            if _isDm and _inCbt then
-                if not tbNpc.dmFootSince then tbNpc.dmFootSince = tbNpc.tick_breath end
-            else
-                tbNpc.dmFootSince = nil
+            local _wantRide = 1
+            if (tbNpc.level or 1) < 20 then
+                _wantRide = 0
+            elseif _inCbt and tbNpc.pendingSkillId and SimSkillMeta and SimSkillMeta:CanCastOnHorse(tbNpc.pendingSkillId) ~= 1 then
+                _wantRide = 0
+            elseif _inCbt and tbNpc.isCurrentlyRiding == 0 then
+                _wantRide = 0
+            elseif _inCbt and tbNpc.skillCastBua and tbNpc.skillCastBua[1]
+                   and SimSkillMeta and SimSkillMeta:CanCastOnHorse(tbNpc.skillCastBua[1]) ~= 1
+                   and (not tbNpc.pendingSkillId or SimSkillMeta:CanCastOnHorse(tbNpc.pendingSkillId) ~= 1) then
+                -- Primary train skill is FOOT (e.g. Conlon 372/375): stay dismounted whole fight
+                _wantRide = 0
             end
-            if tbNpc.lastRideWant ~= _wantRide or not tbNpc.remountTick or tbNpc.remountTick <= tbNpc.tick_breath then
-                tbNpc.remountTick = tbNpc.tick_breath + 5*18/REFRESH_RATE   
-                tbNpc.lastRideWant = _wantRide
-                SetNpcRideHorse(tbNpc.finalIndex, _wantRide)
-                if SetBotSpeed then SetBotSpeed(tbNpc.finalIndex, 15, 24) end   
+            if BotMountSync then
+                BotMountSync(tbNpc.finalIndex, _wantRide)
             end
+            if tbNpc.lastRideWant ~= _wantRide or (not _inCbt and (not tbNpc.remountTick or tbNpc.remountTick <= tbNpc.tick_breath)) then
+                if not _inCbt then
+                    tbNpc.remountTick = tbNpc.tick_breath + 8*18/REFRESH_RATE
+                end
+                if tbNpc.lastRideWant ~= _wantRide then
+                    tbNpc.lastRideWant = _wantRide
+                    SetNpcRideHorse(tbNpc.finalIndex, _wantRide)
+                    tbNpc.isCurrentlyRiding = _wantRide
+                    if SetBotSpeed then SetBotSpeed(tbNpc.finalIndex, 15, 24) end
+                end
+            end
+        elseif BotMountSync then
+            BotMountSync(tbNpc.finalIndex, tbNpc.isCurrentlyRiding or 0)
         end
+        if SimEnsureCombatAttackable then SimEnsureCombatAttackable(tbNpc) end
     end
     local tickRate = rate or 1
     if tbNpc.isDead == 1 or (tbNpc.isStanding and tbNpc.isStanding == 1) then
@@ -998,15 +1120,23 @@ function SimCore:OnTimer(tbNpc, rate)
     if PollParty and tbNpc.finalIndex and tbNpc.finalIndex > 0 and not tbNpc.partyPlayerId and not tbNpc.duelPlayerId and not tbNpc.botDuelTarget then
         local pp = PollParty(tbNpc.finalIndex)
         if pp and pp > 0 then
-            tbNpc.partyPlayerId = pp
-            tbNpc.partyFarTicks = 0
-            if SetBotSpeed then SetBotSpeed(tbNpc.finalIndex, 15, 24) end   
-            local pcamp = CallPlayerFunction(pp, GetCurCamp)
-            if pcamp ~= nil then
-                tbNpc.partyOldCamp = tbNpc.camp or 0
-                tbNpc.camp = pcamp
-                if SetNpcCurCamp then SetNpcCurCamp(tbNpc.finalIndex, pcamp) end
+            if SimParty and SimParty.BindBotToPlayer then
+                SimParty:BindBotToPlayer(tbNpc, pp)
+            else
+                tbNpc.partyPlayerId = pp
+                tbNpc.partyFarTicks = 0
+                if SetBotSpeed then SetBotSpeed(tbNpc.finalIndex, 15, 24) end   
+                local pcamp = CallPlayerFunction(pp, GetCurCamp)
+                if pcamp ~= nil then
+                    tbNpc.partyOldCamp = tbNpc.camp or 0
+                    tbNpc.camp = pcamp
+                    if SetNpcCurCamp then SetNpcCurCamp(tbNpc.finalIndex, pcamp) end
+                end
             end
+        elseif tbNpc.mode == "train" and SimParty and SimParty.InviteNearbyPlayer
+            and mod(tbNpc.tick_breath, 60*18/REFRESH_RATE) == 0 and random(1, 100) <= 8 then
+            -- Rare bot->player invite while grinding nearby (avoid spam)
+            SimParty:InviteNearbyPlayer(self, tbNpc, 15)
         end
     end   
     if tbNpc.dashUntil and tbNpc.tick_breath < tbNpc.dashUntil then        
