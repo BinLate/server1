@@ -246,7 +246,7 @@ end
 
 
 SIMBOT_MELEE_SKILLS = {[318]=1,[319]=1,[322]=1,[323]=1,[325]=1,[361]=1,[368]=1}
--- Legacy blacklist removed: use SimProgression:CanCastOnHorse (HorseLimit>=1) instead
+-- Legacy blacklist removed: use SimSkillMeta:CanCastOnHorse (HorseLimit==0 may mount) instead
 SIMBOT_DISMOUNT_SKILLS = {}
 SIM_DIR8X = {1, 1, 0, -1, -1, -1, 0, 1}   
 SIM_DIR8Y = {0, 1, 1, 1, 0, -1, -1, -1}
@@ -790,6 +790,18 @@ function SimBotDuelMove(simInstance, tbNpc)
     if _inBandBV and NpcCastSkill and SimPickSkill and (not tbNpc.botCastTick or tbNpc.botCastTick <= tbNpc.tick_breath) then
         local sk = SimPickSkill(tbNpc, 1)  
         if sk and sk[1] and sk[1] > 0 then
+            if SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
+            if SimSkillMeta and SimSkillMeta:CanCastOnHorse(sk[1]) ~= 1 then
+                local stillRide = 0
+                if GetNpcRideHorse then stillRide = GetNpcRideHorse(tbNpc.finalIndex) or 0 end
+                if stillRide == 1 or tbNpc.isCurrentlyRiding == 1 then
+                    if SetNpcRideHorse then SetNpcRideHorse(tbNpc.finalIndex, 0) end
+                    if BotMountSync then BotMountSync(tbNpc.finalIndex, 0) end
+                    tbNpc.isCurrentlyRiding = 0
+                    tbNpc.botCastTick = tbNpc.tick_breath + 1
+                    return 1
+                end
+            end
             if SetNpcLevel then SetNpcLevel(tbNpc.finalIndex, tbNpc.level or 1) end   
             if SetNpcAtkSpeed then SetNpcAtkSpeed(tbNpc.finalIndex, tbNpc.attackSpeed or 100) end
             local _gd = GetNpcDoing and GetNpcDoing(tbNpc.finalIndex) or 1   
