@@ -171,9 +171,17 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
         local weaponBranch = (savedBot and savedBot.weaponBranch) or nil
         local personality = (savedBot and savedBot.personality) or "balanced"
 
-        -- 5-10% ty le bot bat Do Sat (Camp 5)
-        local isDoSat = (savedBot and savedBot.camp == 5) or (random(1, 100) <= 8)
-        local camp = (isDoSat and 5) or 0
+        -- Do Sat (camp 5): only when TRAIN_DOSAT_PCT > 0; default 0 = peaceful grind
+        local dosatPct = TRAIN_DOSAT_PCT or 0
+        local isDoSat = 0
+        if dosatPct > 0 then
+            if savedBot and savedBot.camp == 5 then
+                isDoSat = 1
+            elseif random(1, 100) <= dosatPct then
+                isDoSat = 1
+            end
+        end
+        local camp = (isDoSat == 1 and 5) or 0
 
         local tbNpc = {
             nNpcId = id,
@@ -194,12 +202,12 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
             noRevive = 0,
             capHP = cap,
             ngoaitrang = 1,
-            CHANCE_ATTACK_PLAYER = (isDoSat and 1) or 0,
+            CHANCE_ATTACK_PLAYER = (isDoSat == 1 and 1) or 0,
             -- Must be >1 so Case3 can start a fight alone (see sim.movement)
             CHANCE_ATTACK_NPC = 2,
             CHANCE_JOIN_FIGHT = 1,
-            RADIUS_FIGHT_PLAYER = (isDoSat and 20) or 15,
-            RADIUS_FIGHT_NPC = (isDoSat and 20) or 15,
+            RADIUS_FIGHT_PLAYER = (isDoSat == 1 and 20) or 15,
+            RADIUS_FIGHT_NPC = (isDoSat == 1 and 20) or 15,
             RADIUS_FIGHT_SCAN = 20,
             leaveFightWhenNoEnemy = 0,
             noStop = 1
@@ -210,7 +218,7 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
             spawnedCount = spawnedCount + 1
             local bot = SimCitizen:Get(nListId)
             if bot and bot.finalIndex and bot.finalIndex > 0 then
-                if isDoSat and SimCityLuyenCong.PK_SHOUTS and getn(SimCityLuyenCong.PK_SHOUTS) > 0 then
+                if isDoSat == 1 and SimCityLuyenCong.PK_SHOUTS and getn(SimCityLuyenCong.PK_SHOUTS) > 0 then
                     local shout = SimCityLuyenCong.PK_SHOUTS[random(1, getn(SimCityLuyenCong.PK_SHOUTS))]
                     if NpcChat then NpcChat(bot.finalIndex, shout) end
                 end
@@ -343,9 +351,22 @@ function SimCityLuyenCong:mainMenu()
     end
 
     tinsert(tbSay, "Kich hoat toan bo cac map luyen cong/#SimCityLuyenCong:spawnAllMaps()")
+    tinsert(tbSay, "Moi SimBot gan vao PT cua toi/#SimCityLuyenCong:inviteBotToMyParty()")
     tinsert(tbSay, "Thu hoi - Don dep toan bo bot luyen cong/#SimCityLuyenCong:removeAll()")
     tinsert(tbSay, "Ket thuc doi thoai/no")
     CreateTaskSay(tbSay)
+end
+
+function SimCityLuyenCong:inviteBotToMyParty()
+    local ok = 0
+    if SimParty and SimParty.InviteNearestBotToPlayer and PlayerIndex then
+        ok = SimParty:InviteNearestBotToPlayer(PlayerIndex, nil, 30)
+    end
+    if ok == 1 then
+        Msg2Player("Da moi SimBot gan nhat vao PT (follow).")
+    else
+        Msg2Player("Khong tim thay SimBot train gan (trong 30 o).")
+    end
 end
 
 function SimCityLuyenCong:spawnAllMaps()

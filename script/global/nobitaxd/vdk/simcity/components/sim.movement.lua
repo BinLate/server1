@@ -34,11 +34,12 @@ function IsActive(self, simInstance,tbNpc)
             end
 
             -- Is this player an enemy?
+            -- Peaceful train (camp0): never proximity-aggro. DoSat camp5: may aggro. Else SIMBOT_AGGRO_PLAYER.
             if tbNpc.lastPos 
                 and tbNpc.camp ~= 0
                 and IsAttackableCamp(camp, tbNpc.camp) == 1
                 and GetDistanceRadius(tbNpc.lastPos.nX32/32, tbNpc.lastPos.nY32/32, pX, pY) <= scanFightRadius
-                and (SIMBOT_AGGRO_PLAYER == 1 or tbNpc.mode == "train")   -- [2026-06-28] train bot proximity-aggro player toi gan (thanh/thon van peace)   -- [2026-06-25] BO GetFightState: bot CHI danh tra khi BI DANH (self-def line duoi), KHONG aggro chi vi player o fight-mode danh con KHAC   -- [2026-06-20] SIMBOT_AGGRO_PLAYER=1: bot NHAM+danh player khac camp du player CHUA bat chien dau 
+                and (tbNpc.camp == 5 or (SIMBOT_AGGRO_PLAYER == 1 and tbNpc.mode ~= "train"))
                  then
                 tbNpc.isPlayerEnemyAround = pID
             end

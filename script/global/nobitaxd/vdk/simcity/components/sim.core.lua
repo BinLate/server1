@@ -234,7 +234,8 @@ end
 
 
 SIMBOT_MELEE_SKILLS = {[318]=1,[319]=1,[322]=1,[323]=1,[325]=1,[361]=1,[368]=1}
-SIMBOT_DISMOUNT_SKILLS = {[318]=1,[319]=1,[323]=1,[325]=1,[328]=1,[380]=1,[336]=1,[337]=1,[339]=1,[342]=1,[351]=1,[353]=1,[357]=1,[359]=1,[362]=1,[365]=1,[368]=1,[372]=1,[375]=1}
+-- Legacy blacklist removed: use SimProgression:CanCastOnHorse (HorseLimit>=1) instead
+SIMBOT_DISMOUNT_SKILLS = {}
 SIM_DIR8X = {1, 1, 0, -1, -1, -1, 0, 1}   
 SIM_DIR8Y = {0, 1, 1, 1, 0, -1, -1, -1}
 SIMBOT_RANGED_DIST = 12  
@@ -278,6 +279,35 @@ function SimPickSkill(tbNpc, noDebuff)
     if tbNpc.skill351 and random(1, 100) <= 40 then
         return {tbNpc.skill351, 20}
     end
+
+    -- Prefer horse-castable skill while mounted
+    local riding = 0
+    if GetNpcRideHorse and tbNpc.finalIndex and tbNpc.finalIndex > 0 then
+        riding = GetNpcRideHorse(tbNpc.finalIndex) or 0
+    elseif tbNpc.isCurrentlyRiding == 1 then
+        riding = 1
+    end
+    if riding == 1 and SimProgression and SimProgression.CanCastOnHorse then
+        local candidates = {}
+        if tbNpc.skillCastBua and tbNpc.skillCastBua[1] and SimProgression:CanCastOnHorse(tbNpc.skillCastBua[1]) == 1 then
+            tinsert(candidates, tbNpc.skillCastBua)
+        end
+        if tbNpc.skillCastBua2 and tbNpc.skillCastBua2[1] and SimProgression:CanCastOnHorse(tbNpc.skillCastBua2[1]) == 1 then
+            tinsert(candidates, tbNpc.skillCastBua2)
+        end
+        if tbNpc.faction and SimCityPhai[tbNpc.faction] and SimCityPhai[tbNpc.faction].normalCast then
+            local nc = SimCityPhai[tbNpc.faction].normalCast
+            for i = 1, getn(nc) do
+                if nc[i] and nc[i][1] and SimProgression:CanCastOnHorse(nc[i][1]) == 1 then
+                    tinsert(candidates, nc[i])
+                end
+            end
+        end
+        if getn(candidates) > 0 then
+            return candidates[random(1, getn(candidates))]
+        end
+    end
+
     local sk = tbNpc.skillCastBua  
     if tbNpc.skillCastBua2 then   
         if tbNpc.bua2Toggle then sk = tbNpc.skillCastBua2 end   
@@ -843,12 +873,19 @@ function SimCore:OnTimer(tbNpc, rate)
         end
     
         if SetNpcRideHorse and tbNpc.tongkim ~= 1 then
-            local _dmSk = tbNpc.skillCastBua and tbNpc.skillCastBua[1]
-            local _isDm = _dmSk and SIMBOT_DISMOUNT_SKILLS[_dmSk]
+            local _sk = tbNpc.skillCastBua and tbNpc.skillCastBua[1]
+            local _canHorse = (_sk and SimProgression and SimProgression.CanCastOnHorse and SimProgression:CanCastOnHorse(_sk) == 1) and 1 or 0
             local _inCbt = (tbNpc.isFighting or 0) == 1 or tbNpc.duelPlayerId or tbNpc.botDuelTarget
-            local _wantRide = (_inCbt and _isDm) and 0 or 1  
+            -- Fighting with non-horse skill -> dismount; horse skill or out of combat -> ride (lv gate in SimRestoreHorseMovement)
+            local _wantRide = 1
+            if _inCbt and _sk and _canHorse == 0 then
+                _wantRide = 0
+            end
+            if (tbNpc.level or 1) < 20 then
+                _wantRide = 0
+            end
            
-            if _isDm and _inCbt then
+            if _wantRide == 0 and _inCbt then
                 if not tbNpc.dmFootSince then tbNpc.dmFootSince = tbNpc.tick_breath end
             else
                 tbNpc.dmFootSince = nil
@@ -998,15 +1035,23 @@ function SimCore:OnTimer(tbNpc, rate)
     if PollParty and tbNpc.finalIndex and tbNpc.finalIndex > 0 and not tbNpc.partyPlayerId and not tbNpc.duelPlayerId and not tbNpc.botDuelTarget then
         local pp = PollParty(tbNpc.finalIndex)
         if pp and pp > 0 then
-            tbNpc.partyPlayerId = pp
-            tbNpc.partyFarTicks = 0
-            if SetBotSpeed then SetBotSpeed(tbNpc.finalIndex, 15, 24) end   
-            local pcamp = CallPlayerFunction(pp, GetCurCamp)
-            if pcamp ~= nil then
-                tbNpc.partyOldCamp = tbNpc.camp or 0
-                tbNpc.camp = pcamp
-                if SetNpcCurCamp then SetNpcCurCamp(tbNpc.finalIndex, pcamp) end
+            if SimParty and SimParty.BindBotToPlayer then
+                SimParty:BindBotToPlayer(tbNpc, pp)
+            else
+                tbNpc.partyPlayerId = pp
+                tbNpc.partyFarTicks = 0
+                if SetBotSpeed then SetBotSpeed(tbNpc.finalIndex, 15, 24) end   
+                local pcamp = CallPlayerFunction(pp, GetCurCamp)
+                if pcamp ~= nil then
+                    tbNpc.partyOldCamp = tbNpc.camp or 0
+                    tbNpc.camp = pcamp
+                    if SetNpcCurCamp then SetNpcCurCamp(tbNpc.finalIndex, pcamp) end
+                end
             end
+        elseif tbNpc.mode == "train" and SimParty and SimParty.InviteNearbyPlayer
+            and mod(tbNpc.tick_breath, 60*18/REFRESH_RATE) == 0 and random(1, 100) <= 8 then
+            -- Rare bot->player invite while grinding nearby (avoid spam)
+            SimParty:InviteNearbyPlayer(self, tbNpc, 15)
         end
     end   
     if tbNpc.dashUntil and tbNpc.tick_breath < tbNpc.dashUntil then        

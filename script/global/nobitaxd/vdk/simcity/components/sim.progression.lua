@@ -342,16 +342,11 @@ SimProgression.FACTION_SKILLS = {
     }
 }
 
--- 5. BANG TRA CUU KY CHIEN (HORSE SKILLS: HorseLimit >= 1 in skills.txt)
-SimProgression.HORSE_SKILLS = {
-    [10] = 1, [17] = 1, [30] = 1, [47] = 1, [50] = 1, [54] = 1,
-    [85] = 1, [91] = 1, [102] = 1, [128] = 1, [155] = 1, [164] = 1,
-    [271] = 1, [283] = 1, [284] = 1, [286] = 1, [288] = 1, [290] = 1,
-    [302] = 1, [304] = 1, [321] = 1, [322] = 1, [323] = 1, [325] = 1,
-    [342] = 1, [351] = 1, [361] = 1, [362] = 1, [373] = 1, [375] = 1,
-    [389] = 1, [429] = 1, [1055] = 1, [1058] = 1, [1059] = 1, [1060] = 1,
-    [1069] = 1, [1070] = 1, [1076] = 1, [1109] = 1
-}
+-- 5. BANG TRA CUU KY CHIEN (HorseLimit >= 1 from settings/skills.txt)
+Include("\\script\\global\\nobitaxd\\vdk\\simcity\\components\\sim.horse_skills.lua")
+if not SimProgression.HORSE_SKILLS then
+    SimProgression.HORSE_SKILLS = {}
+end
 
 function SimProgression:CanCastOnHorse(skillId)
     if not skillId or skillId <= 0 then return 0 end
