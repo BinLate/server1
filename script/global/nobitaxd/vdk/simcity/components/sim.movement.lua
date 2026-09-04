@@ -935,17 +935,25 @@ SimMovement.Citizen = {
                 end
             end
  
-            -- Train/outdoor: engine AI (mode 1 from JoinFight) hunts; Lua Update is backup + horse realign
+            -- Train/outdoor: AI hunts; Lua always force-casts faction skill (Client VFX)
             local outdoorCast = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
             if (tbNpc.mode == "train" or outdoorCast) and tbNpc.fightSys then
                 local sk = SimPickSkill and SimPickSkill(tbNpc)
-                if sk and sk[1] and SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
+                local sid = (sk and sk[1]) or (tbNpc.skillCastBua and tbNpc.skillCastBua[1]) or 0
+                if sid > 0 then
+                    if SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sid) end
+                    if SetNpcCombat and (not tbNpc.botCombatTick or tbNpc.botCombatTick <= tbNpc.tick_breath) then
+                        SetNpcCombat(tbNpc.finalIndex, 1, sid)
+                        tbNpc.botCombatTick = tbNpc.tick_breath + 8
+                    end
+                end
                 local _e2 = tbNpc.fightSys:IsNpcEnemyAround(simInstance, tbNpc)
                 if _e2 and _e2 > 0 then
                     tbNpc.foundNpcEnemy = _e2
-                    if tbNpc.fightSys.Update then
-                        tbNpc.fightSys:Update(simInstance, tbNpc)
-                    end
+                end
+                -- Always try Lua cast while fighting (do not wait only on scan hit)
+                if tbNpc.fightSys.Update then
+                    tbNpc.fightSys:Update(simInstance, tbNpc)
                 end
             end
 

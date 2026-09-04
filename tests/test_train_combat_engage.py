@@ -48,7 +48,7 @@ class TestTrainCombatEngage(unittest.TestCase):
         idx = src.find('JoinFight = function(self, simInstance, tbNpc, reason)')
         self.assertGreater(idx, 0)
         # Citizen JoinFight body until next top-level method
-        chunk = src[idx : idx + 3500]
+        chunk = src[idx : idx + 4500]
         self.assertIn('tbNpc.mode == "train" or outdoorOk', chunk)
         self.assertIn("SetFightState(tbNpc, 9", chunk)
         # Must not force idle AI for train engage
@@ -60,9 +60,23 @@ class TestTrainCombatEngage(unittest.TestCase):
         # Ensure the train/outdoor branch still ends with SetFightState 9
         train_branch = chunk.find('if tbNpc.mode == "train" or outdoorOk then')
         self.assertGreater(train_branch, 0)
-        after = chunk[train_branch : train_branch + 900]
+        after = chunk[train_branch : train_branch + 1200]
         self.assertIn("SetFightState(tbNpc, 9", after)
         self.assertNotIn("SetFightState(tbNpc, 0", after)
+        # Force skill VFX path
+        self.assertIn("SetNpcCombat", after)
+        self.assertIn("self:Update", after)
+
+    def test_train_cast_prefers_botdoskill_and_short_cd(self):
+        src = self._read("sim.fight.lua")
+        self.assertIn("TRAIN_SKILL_CAST_CD_TICKS", src)
+        self.assertIn("BotDoSkill(tbNpc.finalIndex, skillId, skillLevel, target.npcIndex)", src)
+        cfg = open(
+            os.path.join(ROOT, "..", "config.lua"),
+            encoding="utf-8",
+            errors="replace",
+        ).read()
+        self.assertIn("TRAIN_SKILL_CAST_CD_TICKS = 1", cfg)
 
 
 if __name__ == "__main__":

@@ -358,15 +358,29 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         end
         if SimCommitSkillToggle then SimCommitSkillToggle(tbNpc) end
         local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
+        -- Train: cast faction skills more often so Client shows VFX (engine AI alone often auto-attacks)
+        if tbNpc.mode == "train" then
+            local trainCd = TRAIN_SKILL_CAST_CD_TICKS or 1
+            if trainCd < cdTicks then cdTicks = trainCd end
+        end
         tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
         if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, target.targetId, "player") end
         if SimProgression and SimProgression.AddExp and tbNpc.mode == "train" then
             SimProgression:AddExp(tbNpc, (tbNpc.level or 1) * 20)
         end
     else
-        NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, target.worldX, target.worldY)
+        -- Prefer BotDoSkill(targetIndex) so Client plays skill anim/VFX; fallback NpcCastSkill
+        if BotDoSkill and target.npcIndex and target.npcIndex > 0 then
+            BotDoSkill(tbNpc.finalIndex, skillId, skillLevel, target.npcIndex)
+        else
+            NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, target.worldX, target.worldY)
+        end
         if SimCommitSkillToggle then SimCommitSkillToggle(tbNpc) end
         local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
+        if tbNpc.mode == "train" then
+            local trainCd = TRAIN_SKILL_CAST_CD_TICKS or 1
+            if trainCd < cdTicks then cdTicks = trainCd end
+        end
         tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
         if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, target.targetId, "npc") end
         if SimProgression and SimProgression.AddExp and tbNpc.mode == "train" then
@@ -696,11 +710,14 @@ SimFight.Citizen = {
                 if (GetDistanceRadius(tbNpc.lastFightPos.X/32, tbNpc.lastFightPos.Y/32, currX/32, currY/32) < 16) then
                     local outdoorOkFast = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
                     if tbNpc.mode == "train" or outdoorOkFast then
-                        -- goc: engine AI (mode 9->1) hunts/casts. Mode 0 = idle statues if Lua scan misses.
                         local sk = SimPickSkill and SimPickSkill(tbNpc)
-                        if sk and sk[1] and SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
+                        local sid = (sk and sk[1]) or (tbNpc.skillCastBua and tbNpc.skillCastBua[1]) or 0
+                        if sid > 0 and SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sid) end
                         self:SetFightState(tbNpc, 9, currX, currY)
                         if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
+                        -- Bind combat skill so engine AI prefers VFX skill, not bare auto-attack
+                        if SetNpcCombat and sid > 0 then SetNpcCombat(tbNpc.finalIndex, 1, sid) end
+                        if self.Update then self:Update(simInstance, tbNpc) end
                     else
                         self:SetFightState(tbNpc, 9, currX, currY)
                     end
@@ -711,13 +728,18 @@ SimFight.Citizen = {
         
         local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
         if tbNpc.mode == "train" or outdoorOk then
-            -- CRITICAL: train/outdoor MUST use engine AI (9->1) like server1-goc.
-            -- Mode 0 + Lua-only cast was leaving bots idle next to monsters (no GetNpcAroundNpcList hit / 5% cast gate).
-            -- Horse: align mount state BEFORE enabling AI so FOOT skills are not cast while mounted.
+            -- Engine AI hunts (9->1). Lua Update + SetNpcCombat(skillId) force visible faction skills.
             local sk = SimPickSkill and SimPickSkill(tbNpc)
-            if sk and sk[1] and SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
+            local sid = (sk and sk[1]) or (tbNpc.skillCastBua and tbNpc.skillCastBua[1]) or 0
+            if sid > 0 and SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sid) end
             self:SetFightState(tbNpc, 9, currX, currY)
             if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
+            if SetNpcCombat and sid > 0 then SetNpcCombat(tbNpc.finalIndex, 1, sid) end
+            if (not tbNpc.foundNpcEnemy) or tbNpc.foundNpcEnemy <= 0 then
+                local e = self:IsNpcEnemyAround(simInstance, tbNpc)
+                if e and e > 0 then tbNpc.foundNpcEnemy = e end
+            end
+            if self.Update then self:Update(simInstance, tbNpc) end
             return 1
         end
         tbNpc.entitySys:Respawn(simInstance, tbNpc, 3, "JoinFight " .. reason)      
