@@ -1,6 +1,6 @@
 --========================================================
 -- SIMBOT LUYEN CONG PLUGIN & DYNAMIC AOI SYSTEM (PHASE 4)
--- Engine JX1 Linux - Pure ASCII / ANSI Encoding
+-- Engine JX1 Linux - Vietnamese menu in TCVN3 (ABC), same as pthanhthi.lua
 --========================================================
 
 Include("\\script\\global\\nobitaxd\\vdk\\simcity\\components\\sim.gear.lua")
@@ -14,56 +14,62 @@ SimCityLuyenCong = {
 }
 
 SimCityLuyenCong.TRAIN_MAPS = {
-    -- mapId MUST exist in settings/global/vdk/simcity/maps/thanhthi.txt (path nodes).
-    -- Bracket = bot level range. Do NOT invent Map IDs.
-    -- 0x (1-9) thon/tran tan thu
-    [1]  = { name = "Giang Tan Thon (1-9)", mapId = 20, minLv = 1, maxLv = 9, count = 8 },
-    [2]  = { name = "Vinh Lac Tran (1-9)", mapId = 99, minLv = 1, maxLv = 9, count = 8 },
-    [3]  = { name = "Chu Tien Tran (1-9)", mapId = 100, minLv = 1, maxLv = 9, count = 8 },
-    [4]  = { name = "Dao Huong Thon (1-9)", mapId = 101, minLv = 1, maxLv = 9, count = 8 },
-    [5]  = { name = "Long Mon Tran (1-9)", mapId = 121, minLv = 1, maxLv = 9, count = 8 },
-    [6]  = { name = "Thach Co Tran (1-9)", mapId = 153, minLv = 1, maxLv = 9, count = 8 },
-    [7]  = { name = "Long Tuyen Thon (1-9)", mapId = 174, minLv = 1, maxLv = 9, count = 8 },
-    -- 1x (10-19) thanh thi + map luyen
-    [8]  = { name = "Phuong Tuong (10-19)", mapId = 1, minLv = 10, maxLv = 19, count = 8 },
-    [9]  = { name = "Bien Kinh (10-19)", mapId = 37, minLv = 10, maxLv = 19, count = 10 },
-    [10] = { name = "Lam An (10-19)", mapId = 176, minLv = 10, maxLv = 19, count = 10 },
-    [11] = { name = "Tuong Duong (10-19)", mapId = 78, minLv = 10, maxLv = 19, count = 8 },
-    [12] = { name = "Duong Chau (10-19)", mapId = 80, minLv = 10, maxLv = 19, count = 8 },
-    [13] = { name = "Dai Ly (10-19)", mapId = 162, minLv = 10, maxLv = 19, count = 8 },
-    [14] = { name = "Ba Lang Huyen (10-19)", mapId = 53, minLv = 10, maxLv = 19, count = 8 },
-    [15] = { name = "Moc Nhan Hang (10-19)", mapId = 111, minLv = 10, maxLv = 19, count = 10 },
-    [16] = { name = "Nhan Dang Son (10-19)", mapId = 195, minLv = 10, maxLv = 19, count = 10 },
-    [17] = { name = "Kim Quang Dong (10-19)", mapId = 4, minLv = 10, maxLv = 19, count = 12 },
-    -- 2x (20-29)
-    [18] = { name = "Kiem Cac Tay Bac (20-29)", mapId = 3, minLv = 20, maxLv = 29, count = 12 },
-    [19] = { name = "Kiem Cac Tay Nam (20-29)", mapId = 19, minLv = 20, maxLv = 29, count = 12 },
-    [20] = { name = "Kiem Cac Trung Nguyen (20-29)", mapId = 43, minLv = 20, maxLv = 29, count = 12 },
-    [21] = { name = "Tan Lang (20-29)", mapId = 7, minLv = 20, maxLv = 29, count = 12 },
-    [22] = { name = "Vu Lang Son (20-29)", mapId = 70, minLv = 20, maxLv = 29, count = 12 },
-    [23] = { name = "La Tieu Son (20-29)", mapId = 179, minLv = 20, maxLv = 29, count = 12 },
-    [24] = { name = "Bach Thuy Dong (20-29)", mapId = 71, minLv = 20, maxLv = 29, count = 10 },
-    [25] = { name = "Phuc Luu Dong (20-29)", mapId = 73, minLv = 20, maxLv = 29, count = 10 },
-    -- 3x (30-39)
-    [26] = { name = "Yen Tu Dong (30-39)", mapId = 77, minLv = 30, maxLv = 39, count = 14 },
-    [27] = { name = "Thuc Cuong Son (30-39)", mapId = 92, minLv = 30, maxLv = 39, count = 14 },
-    -- 4x (40-49)
-    [28] = { name = "Kinh Hoang Dong (40-49)", mapId = 5, minLv = 40, maxLv = 49, count = 14 },
-    [29] = { name = "Phuc Nguu Son Tay (40-49)", mapId = 41, minLv = 40, maxLv = 49, count = 14 },
-    [30] = { name = "Mat That Thieu Lam (40-49)", mapId = 113, minLv = 40, maxLv = 49, count = 12 },
-    [31] = { name = "Diem Thuong Dong Tang 3 (40-49)", mapId = 173, minLv = 40, maxLv = 49, count = 12 },
-    -- 5x (50-59)
-    [32] = { name = "Vu Lang Dong (50-59)", mapId = 199, minLv = 50, maxLv = 59, count = 16 },
-    -- 6x-7x (60-79)
-    [33] = { name = "Lam Du Quan (60-79)", mapId = 319, minLv = 60, maxLv = 79, count = 18 },
-    -- 8x (80-89)
-    [34] = { name = "Dao Hoa Nguyen (80-89)", mapId = 55, minLv = 80, maxLv = 89, count = 16 },
-    -- 9x + 90-120 (same map, one roster)
-    [35] = { name = "Truong Bach Son Nam (90-120)", mapId = 321, minLv = 90, maxLv = 120, count = 22 },
-    -- High brackets
-    [36] = { name = "Mac Bac Thao Nguyen (120-150)", mapId = 341, minLv = 120, maxLv = 150, count = 20 },
-    [37] = { name = "Sa Mac Tang 1 (150-180)", mapId = 225, minLv = 150, maxLv = 180, count = 20 },
-    [38] = { name = "Vi Son Dao (180-200)", mapId = 342, minLv = 180, maxLv = 200, count = 20 }
+    -- mapId MUST exist in thanhthi.txt. Do NOT invent Map IDs.
+    -- Menu groups by TRAIN_BRACKETS; spawnForBracket = ALL maps in band.
+    [1]  = { name = "Giang T©n Th«n (1-9)", mapId = 20, minLv = 1, maxLv = 9, count = 8 },
+    [2]  = { name = "VÜnh L¹c TrÊn (1-9)", mapId = 99, minLv = 1, maxLv = 9, count = 8 },
+    [3]  = { name = "Chu Tiªn TrÊn (1-9)", mapId = 100, minLv = 1, maxLv = 9, count = 8 },
+    [4]  = { name = "®µo H­¬ng Th«n (1-9)", mapId = 101, minLv = 1, maxLv = 9, count = 8 },
+    [5]  = { name = "Long M«n TrÊn (1-9)", mapId = 121, minLv = 1, maxLv = 9, count = 8 },
+    [6]  = { name = "Th¹ch Cæ TrÊn (1-9)", mapId = 153, minLv = 1, maxLv = 9, count = 8 },
+    [7]  = { name = "Long TuyÒn Th«n (1-9)", mapId = 174, minLv = 1, maxLv = 9, count = 8 },
+    [8]  = { name = "Ph­îng T­êng (10-19)", mapId = 1, minLv = 10, maxLv = 19, count = 8 },
+    [9]  = { name = "BiÖn Kinh (10-19)", mapId = 37, minLv = 10, maxLv = 19, count = 10 },
+    [10] = { name = "L©m An (10-19)", mapId = 176, minLv = 10, maxLv = 19, count = 10 },
+    [11] = { name = "T­¬ng D­¬ng (10-19)", mapId = 78, minLv = 10, maxLv = 19, count = 8 },
+    [12] = { name = "D­¬ng Ch©u (10-19)", mapId = 80, minLv = 10, maxLv = 19, count = 8 },
+    [13] = { name = "®¹i Lý (10-19)", mapId = 162, minLv = 10, maxLv = 19, count = 8 },
+    [14] = { name = "Ba L¨ng HuyÖn (10-19)", mapId = 53, minLv = 10, maxLv = 19, count = 8 },
+    [15] = { name = "HÎm Méc Nh©n (10-19)", mapId = 111, minLv = 10, maxLv = 19, count = 10 },
+    [16] = { name = "Nh¹n ®¨ng S¬n (10-19)", mapId = 195, minLv = 10, maxLv = 19, count = 10 },
+    [17] = { name = "Kim Quang ®éng (10-19)", mapId = 4, minLv = 10, maxLv = 19, count = 12 },
+    [18] = { name = "KiÕm C¸c T©y B¾c (20-29)", mapId = 3, minLv = 20, maxLv = 29, count = 12 },
+    [19] = { name = "KiÕm C¸c T©y Nam (20-29)", mapId = 19, minLv = 20, maxLv = 29, count = 12 },
+    [20] = { name = "KiÕm C¸c Trung Nguyªn (20-29)", mapId = 43, minLv = 20, maxLv = 29, count = 12 },
+    [21] = { name = "TÇn L¨ng (20-29)", mapId = 7, minLv = 20, maxLv = 29, count = 12 },
+    [22] = { name = "Vò L¨ng S¬n (20-29)", mapId = 70, minLv = 20, maxLv = 29, count = 12 },
+    [23] = { name = "La Tiªu S¬n (20-29)", mapId = 179, minLv = 20, maxLv = 29, count = 12 },
+    [24] = { name = "B¹ch Thñy ®éng (20-29)", mapId = 71, minLv = 20, maxLv = 29, count = 10 },
+    [25] = { name = "Phôc L­u ®éng (20-29)", mapId = 73, minLv = 20, maxLv = 29, count = 10 },
+    [26] = { name = "YÕn Tö ®éng (30-39)", mapId = 77, minLv = 30, maxLv = 39, count = 14 },
+    [27] = { name = "Thôc C­¬ng S¬n (30-39)", mapId = 92, minLv = 30, maxLv = 39, count = 14 },
+    [28] = { name = "Kinh Hoµng ®éng (40-49)", mapId = 5, minLv = 40, maxLv = 49, count = 14 },
+    [29] = { name = "Phôc Ng­u S¬n T©y (40-49)", mapId = 41, minLv = 40, maxLv = 49, count = 14 },
+    [30] = { name = "MËt ThÊt ThiÕu L©m (40-49)", mapId = 113, minLv = 40, maxLv = 49, count = 12 },
+    [31] = { name = "®iÓm Th­¬ng ®éng tÇng 3 (40-49)", mapId = 173, minLv = 40, maxLv = 49, count = 12 },
+    [32] = { name = "Vò L¨ng ®éng (50-59)", mapId = 199, minLv = 50, maxLv = 59, count = 16 },
+    [33] = { name = "L©m Du Quan (60-79)", mapId = 319, minLv = 60, maxLv = 79, count = 18 },
+    [34] = { name = "®µo Hoa Nguyªn (80-89)", mapId = 55, minLv = 80, maxLv = 89, count = 16 },
+    [35] = { name = "Tr­êng B¹ch S¬n Nam (90-120)", mapId = 321, minLv = 90, maxLv = 120, count = 22 },
+    [36] = { name = "M¹c B¾c Th¶o Nguyªn (120-150)", mapId = 341, minLv = 120, maxLv = 150, count = 20 },
+    [37] = { name = "Sa M¹c tÇng 1 (150-180)", mapId = 225, minLv = 150, maxLv = 180, count = 20 },
+    [38] = { name = "Vi S¬n ®¶o (180-200)", mapId = 342, minLv = 180, maxLv = 200, count = 20 }
+}
+
+SimCityLuyenCong.TRAIN_BRACKETS = {
+    -- Chon 1 hang = goi bot tren TAT CA map thuoc dang cap do
+    [1] = { key = "0x", label = "0x - Th«n trÊn t©n thñ (1-9)", minLv = 1, maxLv = 9 },
+    [2] = { key = "1x", label = "1x - Thµnh thÞ vµ luyÖn c«ng (10-19)", minLv = 10, maxLv = 19 },
+    [3] = { key = "2x", label = "2x - Map luyÖn c«ng (20-29)", minLv = 20, maxLv = 29 },
+    [4] = { key = "3x", label = "3x - Map luyÖn c«ng (30-39)", minLv = 30, maxLv = 39 },
+    [5] = { key = "4x", label = "4x - Map luyÖn c«ng (40-49)", minLv = 40, maxLv = 49 },
+    [6] = { key = "5x", label = "5x - Map luyÖn c«ng (50-59)", minLv = 50, maxLv = 59 },
+    [7] = { key = "6x", label = "6x-7x - Map luyÖn c«ng (60-79)", minLv = 60, maxLv = 79 },
+    [8] = { key = "8x", label = "8x - Map luyÖn c«ng (80-89)", minLv = 80, maxLv = 89 },
+    [9] = { key = "9x", label = "9x - Map luyÖn c«ng (90-120)", minLv = 90, maxLv = 120 },
+    [10] = { key = "120", label = "120-150 - Map cao cÊp", minLv = 120, maxLv = 150 },
+    [11] = { key = "150", label = "150-180 - Map cao cÊp", minLv = 150, maxLv = 180 },
+    [12] = { key = "180", label = "180-200 - Map cao cÊp", minLv = 180, maxLv = 200 }
 }
 
 -- PK / Chat shouts for Do Sat (Camp 5) bots
@@ -366,29 +372,106 @@ function SimCityLuyenCong:ATick()
     end
 end
 
+function SimCityLuyenCong:bracketStatus(minLv, maxLv)
+    local activeMaps = 0
+    local bots = 0
+    local totalMaps = 0
+    for i = 1, getn(self.TRAIN_MAPS) do
+        local m = self.TRAIN_MAPS[i]
+        if m.minLv == minLv and m.maxLv == maxLv then
+            totalMaps = totalMaps + 1
+            local state = self.mapState[m.mapId]
+            if state and state.isSpawned == 1 then
+                activeMaps = activeMaps + 1
+                bots = bots + (state.botCount or 0)
+            end
+        end
+    end
+    return activeMaps, bots, totalMaps
+end
+
+function SimCityLuyenCong:spawnForBracket(bracketIdx)
+    local br = self.TRAIN_BRACKETS[bracketIdx]
+    if not br then return end
+    local n = 0
+    for i = 1, getn(self.TRAIN_MAPS) do
+        local m = self.TRAIN_MAPS[i]
+        if m.minLv == br.minLv and m.maxLv == br.maxLv then
+            self:spawnForMap(i)
+            n = n + 1
+        end
+    end
+    Msg2Player(br.label .. " - ®· gäi SimBot trªn " .. n .. " map.")
+end
+
+function SimCityLuyenCong:hibernateBracket(bracketIdx)
+    local br = self.TRAIN_BRACKETS[bracketIdx]
+    if not br then return end
+    local n = 0
+    for i = 1, getn(self.TRAIN_MAPS) do
+        local m = self.TRAIN_MAPS[i]
+        if m.minLv == br.minLv and m.maxLv == br.maxLv then
+            self:hibernateMap(m.mapId)
+            n = n + 1
+        end
+    end
+    Msg2Player(br.label .. " - ®· thu håi " .. n .. " map.")
+end
+
 function SimCityLuyenCong:mainMenu()
-    -- ASCII-only menu text (CreateTaskSay splits on '/'; never put '/' in label)
-    -- Do not use <color=...> here â€” many clients show raw tags in option rows
-    local text = "=== HE THONG LUYEN CONG SIMBOT (DYNAMIC AOI) ==="
-    text = text .. "<enter>Trang thai phan bo Simbot train theo vi tri nguoi choi:"
+    -- CreateTaskSay limit: list brackets, not every map row.
+    -- Never put '/' in label. No <color=...> on option rows.
+    local text = "=== HÖ thèng luyÖn c«ng SimBot (Dynamic AOI) ==="
+    text = text .. "<enter>Chän ®¼ng cÊp map ®Ó gäi SimBot trªn tÊt c¶ map thuéc nhãm ®ã:"
     local tbSay = { text }
+
+    for i = 1, getn(self.TRAIN_BRACKETS) do
+        local br = self.TRAIN_BRACKETS[i]
+        local activeMaps, bots, totalMaps = self:bracketStatus(br.minLv, br.maxLv)
+        local statusStr
+        if activeMaps > 0 then
+            statusStr = "[Train " .. activeMaps .. "-" .. totalMaps .. " map - " .. bots .. " bot]"
+        else
+            statusStr = "[NghØ " .. totalMaps .. " map]"
+        end
+        tinsert(tbSay, br.label .. " " .. statusStr .. "/#SimCityLuyenCong:bracketMenu(" .. i .. ")")
+    end
+
+    tinsert(tbSay, "KÝch ho¹t toµn bé map luyÖn c«ng/#SimCityLuyenCong:spawnAllMaps()")
+    tinsert(tbSay, "Mêi SimBot gÇn vµo PT cña t«i/#SimCityLuyenCong:inviteBotToMyParty()")
+    tinsert(tbSay, "Thu håi - Dän s¹ch toµn bé bot luyÖn c«ng/#SimCityLuyenCong:removeAll()")
+    tinsert(tbSay, "KÕt thóc ®èi tho¹i/no")
+    CreateTaskSay(tbSay)
+end
+
+function SimCityLuyenCong:bracketMenu(bracketIdx)
+    local br = self.TRAIN_BRACKETS[bracketIdx]
+    if not br then
+        self:mainMenu()
+        return
+    end
+    local text = br.label
+    text = text .. "<enter>Gäi hoÆc thu håi c¶ nhãm, hoÆc chän tõng map:"
+    local tbSay = { text }
+    tinsert(tbSay, ">> Gäi SimBot tÊt c¶ map nhãm nµy/#SimCityLuyenCong:spawnForBracket(" .. bracketIdx .. ")")
+    tinsert(tbSay, ">> Thu håi tÊt c¶ map nhãm nµy/#SimCityLuyenCong:hibernateBracket(" .. bracketIdx .. ")")
 
     for i = 1, getn(self.TRAIN_MAPS) do
         local m = self.TRAIN_MAPS[i]
-        local state = self.mapState[m.mapId]
-        local statusStr
-        if state and state.isSpawned == 1 then
-            statusStr = "[Dang train - " .. (state.botCount or 0) .. " bot]"
-        else
-            statusStr = "[Nghi - Hibernate]"
+        if m.minLv == br.minLv and m.maxLv == br.maxLv then
+            local state = self.mapState[m.mapId]
+            local statusStr
+            if state and state.isSpawned == 1 then
+                statusStr = "[Train - " .. (state.botCount or 0) .. " bot]"
+            else
+                statusStr = "[NghØ]"
+            end
+            tinsert(tbSay, m.name .. " " .. statusStr .. "/#SimCityLuyenCong:spawnForMap(" .. i .. ")")
         end
-        tinsert(tbSay, m.name .. " " .. statusStr .. "/#SimCityLuyenCong:spawnForMap(" .. i .. ")")
     end
 
-    tinsert(tbSay, "Kich hoat toan bo cac map luyen cong/#SimCityLuyenCong:spawnAllMaps()")
-    tinsert(tbSay, "Moi SimBot gan vao PT cua toi/#SimCityLuyenCong:inviteBotToMyParty()")
-    tinsert(tbSay, "Thu hoi - Don dep toan bo bot luyen cong/#SimCityLuyenCong:removeAll()")
-    tinsert(tbSay, "Ket thuc doi thoai/no")
+    tinsert(tbSay, "Quay l¹i/#SimCityLuyenCong:mainMenu()")
+    tinsert(tbSay, "KÕt thóc ®èi tho¹i/no")
     CreateTaskSay(tbSay)
 end
 
@@ -398,9 +481,9 @@ function SimCityLuyenCong:inviteBotToMyParty()
         ok = SimParty:InviteNearestBotToPlayer(PlayerIndex, nil, 30)
     end
     if ok == 1 then
-        Msg2Player("Da moi SimBot gan nhat vao PT (follow).")
+        Msg2Player("®· mêi SimBot gÇn nhÊt vµo PT (follow).")
     else
-        Msg2Player("Khong tim thay SimBot train gan (trong 30 o).")
+        Msg2Player("Kh«ng t×m thÊy SimBot train gÇn (trong 30 «).")
     end
 end
 
@@ -408,14 +491,14 @@ function SimCityLuyenCong:spawnAllMaps()
     for i = 1, getn(self.TRAIN_MAPS) do
         self:spawnForMap(i)
     end
-    Msg2Player("Da kich hoat toan bo cac map luyen cong!")
+    Msg2Player("®· kÝch ho¹t toµn bé c¸c map luyÖn c«ng!")
 end
 
 function SimCityLuyenCong:removeAll()
     for i = 1, getn(self.TRAIN_MAPS) do
         self:hibernateMap(self.TRAIN_MAPS[i].mapId)
     end
-    Msg2Player("Da thu hoi va don dep toan bo bot luyen cong tren cac ban do!")
+    Msg2Player("®· thu håi vµ dän s¹ch toµn bé bot luyÖn c«ng trªn c¸c b¶n ®å!")
 end
 
 function no()

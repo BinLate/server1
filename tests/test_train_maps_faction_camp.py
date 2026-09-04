@@ -90,6 +90,22 @@ class TestTrainMapBrackets(unittest.TestCase):
         self.assertIn("isDoSat", src)
         self.assertNotIn("local camp = (isDoSat == 1 and 5) or 0", src)
 
+    def test_menu_uses_brackets_not_flat_map_list(self):
+        raw = open(os.path.join(SIM, "plugins", "pluyencong.lua"), "rb").read()
+        src = raw.decode("latin-1")
+        self.assertIn("TRAIN_BRACKETS", src)
+        self.assertIn("spawnForBracket", src)
+        self.assertIn("bracketMenu", src)
+        self.assertIn("hibernateBracket", src)
+        # CreateTaskSay splits on '/': status must not use slash between counts
+        self.assertNotIn('activeMaps .. "/" .. totalMaps', src)
+        self.assertIn('activeMaps .. "-" .. totalMaps', src)
+        # Main menu must iterate brackets, not dump every TRAIN_MAPS row
+        self.assertIn("getn(self.TRAIN_BRACKETS)", src)
+        self.assertIn("SimCityLuyenCong:bracketMenu", src)
+        # TCVN3 đ (0xAE) present in Vietnamese labels
+        self.assertIn(b"\xae", raw)
+
     def test_skill_level_gate(self):
         prog = open(os.path.join(SIM, "components", "sim.progression.lua"), encoding="utf-8", errors="replace").read()
         self.assertIn("if lv >= 10 then", prog)
