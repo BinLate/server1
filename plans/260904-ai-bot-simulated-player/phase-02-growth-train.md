@@ -1,5 +1,5 @@
 # Phase 02: Bot lớn dần + tự train (+ kiến trúc population)
-Status: ⬜ Pending
+Status: 🟡 In Progress
 Dependencies: Phase 01
 
 ## Objective
@@ -11,27 +11,28 @@ AOI/hibernate/budget là **yêu cầu kiến trúc từ phase này**, không ch�
 ## Requirements
 
 ### Functional
-- [ ] Audit `pluyencong.lua` + `sim.progression` + roster save/load: PARTIAL→COMPLETE
-- [ ] Spawn level theo config (mặc định ~10)
-- [ ] Tự tìm quái, nhận EXP, level up, cập nhật skill theo level
-- [ ] Đổi bãi train theo sức mạnh / map table
-- [ ] Death → respawn → tiếp tục cùng identity
-- [ ] Hibernate/AOI: map trống → sleep; có player → wake **cùng roster**
-- [ ] Idempotent spawn: **no duplicate** cùng bot id
-- [ ] Global/map bot caps (`TRAIN_BOT_MAX_PER_MAP`, `TRAIN_BOT_GLOBAL_BUDGET`)
+- [x] Audit `pluyencong.lua` + `sim.progression` + roster save/load: PARTIAL→COMPLETE (slice 1)
+- [x] Spawn level theo config (mặc định ~10) — `SIMBOT_TRAIN_START_LEVEL`
+- [x] Tự tìm quái, nhận EXP, level up (core ticks) — skill polish còn lại
+- [x] Đổi bãi train theo sức mạnh / map table (hibernate migrate)
+- [ ] Death → respawn → tiếp tục cùng identity (PARTIAL)
+- [x] Hibernate/AOI: map trống → sleep; có player → wake roster
+- [ ] Idempotent spawn: **no duplicate** cùng bot id (count gate only)
+- [x] Global/map bot caps (`TRAIN_BOT_MAX_PER_MAP`, `TRAIN_BOT_GLOBAL_BUDGET`)
 
 ### Non-Functional
-- [ ] Bounded pathfinding & timers
-- [ ] Persistence atomic (đã có hướng `_sim_*`; verify Lua 4.0 safe)
-- [ ] Không block game loop khi I/O save
+- [x] Bounded pathfinding & timers (existing)
+- [x] Persistence atomic (đã có `_sim_*`; Lua 4.0 safe)
+- [x] Không block game loop khi I/O save (hibernate path)
 
 ## Implementation Steps
-1. [ ] Audit matrix train lifecycle vs vision
+1. [x] Audit matrix train lifecycle vs vision
 2. [ ] Định nghĩa identity key (mapId + botId/name stable)
-3. [ ] Wire Save/Load roster vào spawn/hibernate paths
+3. [x] Wire Save/Load roster vào spawn/hibernate paths (AOI owns train maps)
 4. [ ] Level/skill curve tới `SIMBOT_MAX_LEVEL` / max server
-5. [ ] Map transfer rules khi “đủ mạnh”
+5. [x] Map transfer rules khi “đủ mạnh” (on hibernate)
 6. [ ] Stress: caps, no leak timers, no dup bots
+7. [x] Fix TRAIN_MAPS IDs + remove pthanhthi dual train spawn
 
 ## Files
 - `plugins/pluyencong.lua`
