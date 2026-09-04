@@ -1,6 +1,6 @@
 # Phase 01: Thành thị như bản gốc
-Status: ⬜ Pending
-Dependencies: Phase 00
+Status: 🟡 In Progress
+Dependencies: Phase 00 ✅
 
 ## Objective
 
@@ -9,22 +9,22 @@ Khôi phục behavior thành thị ổn định từ `server1-goc` / upstream [v
 ## Requirements
 
 ### Functional
-- [ ] Audit matrix thành thị: walk / stall / fight / chat chance / Triệu Mẫn / Vô Kỵ / EnterMap spawn
-- [ ] Bot đi lại trên nodes/preset paths
-- [ ] Gian hàng / attraction behavior như gốc
-- [ ] Bot-vs-bot / chance fight theo config gốc (không “AI mới”)
-- [ ] NPC điều khiển SimCity (Triệu Mẫn menu) hoạt động
-- [ ] Không rewrite hệ thống đang `COMPLETE`
+- [x] Audit matrix thành thị: walk / stall / fight / chat chance / Triệu Mẫn / Vô Kỵ / EnterMap spawn
+- [x] Bot đi lại trên nodes/preset paths (path COMPLETE vs goc; live confirm pending)
+- [x] Gian hàng / attraction behavior như gốc (code COMPLETE)
+- [x] Bot-vs-bot / chance fight theo config gốc (không “AI mới”)
+- [x] NPC điều khiển SimCity (Triệu Mẫn menu) hoạt động — indent + Luyện Công guard
+- [x] Không rewrite hệ thống đang `COMPLETE`
 
 ### Non-Functional
-- [ ] Diff tối thiểu so với goc trên đường spawn thành thị
-- [ ] Regression: spawn Phase 0 vẫn xanh
+- [x] Diff tối thiểu so với goc trên đường spawn thành thị
+- [x] Regression: spawn Phase 0 vẫn xanh (user confirm)
 
 ## Implementation Steps
-1. [ ] Feature matrix `COMPLETE/PARTIAL/BROKEN/MISSING` (report)
-2. [ ] Port/fix từng mục BROKEN từ goc hoặc upstream — từng PR nhỏ
-3. [ ] Verify 7 thành chính + vài thôn
-4. [ ] Document config knobs thành thị (`THANHTHI_SIZE`, `STARTUP_AUTOADD_THANHTHI`, …)
+1. [x] Feature matrix `COMPLETE/PARTIAL/BROKEN/MISSING` (report)
+2. [x] Fix BROKEN: eager `initThanhThi`, lazy `Get`, EnterMap guard, menu cleanup
+3. [ ] Verify 7 thành chính + vài thôn (user / live)
+4. [x] Document config knobs thành thị (`THANHTHI_SIZE`, `STARTUP_AUTOADD_THANHTHI`, …) — see audit report
 
 ## Files (expected touch)
 - `plugins/pthanhthi.lua`, `pworld.lua`, `pnpcinfo.lua`, `pchat.lua`

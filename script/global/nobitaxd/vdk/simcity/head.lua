@@ -49,3 +49,8 @@ SimCityNPCInfo:init()
 if SimCityLuyenCong and SimCityLuyenCong.init then
     SimCityLuyenCong:init()
 end
+
+-- Eager city world init (do not wait for Triệu Mẫn dialog Include)
+if SimCityWorld and SimCityWorld.initThanhThi then
+    SimCityWorld:initThanhThi()
+end

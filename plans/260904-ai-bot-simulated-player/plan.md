@@ -54,8 +54,8 @@ Phase 3–4 làm ngay sau MVP vì gắn trực tiếp với “lớn lên như n
 
 | Phase | Name | Status | Progress |
 |-------|------|--------|----------|
-| 00 | Restore spawn (blocker) | 🟡 In Progress | 80% |
-| 01 | Thành thị như bản gốc | ⬜ Pending | 0% |
+| 00 | Restore spawn (blocker) | ✅ Done | 100% |
+| 01 | Thành thị như bản gốc | 🟡 In Progress | 70% |
 | 02 | Bot lớn dần + tự train (+ AOI/persistence kiến trúc) | ⬜ Pending | 0% |
 | 03 | Trang bị + ngựa theo cấp | ⬜ Pending | 0% |
 | 04 | Hành vi môn phái | ⬜ Pending | 0% |
@@ -65,7 +65,7 @@ Phase 3–4 làm ngay sau MVP vì gắn trực tiếp với “lớn lên như n
 
 ## MVP definition
 
-- [ ] Vào thành thấy bot ổn định; `luaerror` không còn lỗi SimCity load
+- [x] Vào thành thấy bot ổn định; `luaerror` không còn lỗi SimCity load
 - [ ] Thành thị: đi lại / gian hàng / đánh nhau / NPC điều khiển như gốc
 - [ ] Train bots: persistent identity, EXP/level, đổi bãi, hibernate không mất progression
 - [ ] Tống Kim: tối đa 10 bot, tìm địch / chase có bound / rút lui / cleanup hết trận
