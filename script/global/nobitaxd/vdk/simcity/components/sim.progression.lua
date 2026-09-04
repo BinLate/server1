@@ -617,21 +617,24 @@ function _sim_open(path, mode)
     if io and io.open then return io.open(path, mode) end
     return nil
 end
+-- Kingsoft Lua 4.0 rejects nested functions that capture outer locals
+-- ("cannot access a variable in outer scope"). Always pass args to pcall
+-- directly — never wrap a method call inside an anonymous pcall callback.
+function _sim_pcall_result(ok, res, err)
+    if not ok then return 0 end
+    if res == false or res == 0 then return 0 end
+    if res == nil and err ~= nil then return 0 end
+    return 1
+end
 function _sim_flush(f)
     if not f then return 0 end
     if flushfile then
         local ok, res, err = pcall(flushfile, f)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        return _sim_pcall_result(ok, res, err)
     end
     if f.flush then
-        local ok, res, err = pcall(function() return f:flush() end)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        local ok, res, err = pcall(f.flush, f)
+        return _sim_pcall_result(ok, res, err)
     end
     return 1
 end
@@ -639,17 +642,11 @@ function _sim_close(f)
     if not f then return 0 end
     if closefile then
         local ok, res, err = pcall(closefile, f)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        return _sim_pcall_result(ok, res, err)
     end
     if f.close then
-        local ok, res, err = pcall(function() return f:close() end)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        local ok, res, err = pcall(f.close, f)
+        return _sim_pcall_result(ok, res, err)
     end
     return 0
 end
@@ -663,17 +660,11 @@ function _sim_write(f, str)
     if not f or not str then return 0 end
     if write then
         local ok, res, err = pcall(write, f, str)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        return _sim_pcall_result(ok, res, err)
     end
     if f.write then
-        local ok, res, err = pcall(function() return f:write(str) end)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        local ok, res, err = pcall(f.write, f, str)
+        return _sim_pcall_result(ok, res, err)
     end
     return 0
 end
@@ -683,17 +674,11 @@ end
 function _sim_rename(oldp, newp)
     if renamefile then
         local ok, res, err = pcall(renamefile, oldp, newp)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        return _sim_pcall_result(ok, res, err)
     end
     if os and os.rename then
         local ok, res, err = pcall(os.rename, oldp, newp)
-        if not ok then return 0 end
-        if res == false or res == 0 then return 0 end
-        if res == nil and err ~= nil then return 0 end
-        return 1
+        return _sim_pcall_result(ok, res, err)
     end
     return 0
 end

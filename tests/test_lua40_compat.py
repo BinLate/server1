@@ -20,6 +20,9 @@ RE_C_COMMENT = re.compile(rb'/\*')
 RE_LOCAL_FUNCTION = re.compile(rb'\blocal\s+function\b')
 RE_GOTO = re.compile(rb'\bgoto\b')
 RE_INCLUDE = re.compile(rb'Include\("([^"]+)"\)')
+# Nested pcall(function() ... end) cannot close over outer locals on the
+# Kingsoft Lua 4.0 fork ("cannot access a variable in outer scope").
+RE_PCALL_CLOSURE = re.compile(rb'pcall\s*\(\s*function\s*\(')
 
 # group_fighter timer callbacks use the Kingsoft %-pack syntax which is valid
 # only on the engine; excluded from the portable Lua 5.1 parse check.
@@ -75,6 +78,20 @@ class TestKingsoftLua40Compat(unittest.TestCase):
                 bad.append('%s:%d' % (os.path.relpath(path, SIMBOT_ROOT), line))
         self.assertEqual(bad, [], '`goto` does not exist in the Kingsoft Lua '
                                   '4.0 fork: %s' % bad)
+
+    def test_no_pcall_nested_closures(self):
+        """pcall(function() ... end) that closes over outer locals fails with
+        'cannot access a variable in outer scope' on Kingsoft Lua 4.0 and
+        aborts the whole Include (live luaerror_2026_09_04.txt)."""
+        bad = []
+        for path in iter_lua_files(SIMBOT_ROOT):
+            with open(path, 'rb') as fh:
+                data = fh.read()
+            for m in RE_PCALL_CLOSURE.finditer(data):
+                line = data[:m.start()].count(b'\n') + 1
+                bad.append('%s:%d' % (os.path.relpath(path, SIMBOT_ROOT), line))
+        self.assertEqual(bad, [], 'pcall(function()...) closures break load on '
+                                  'Kingsoft Lua 4.0: %s' % bad)
 
 
 class TestIncludeTargetsExist(unittest.TestCase):

@@ -66,6 +66,9 @@ function fixName(inp)
 end
 
 function GetDistanceRadius(nX, nY, oX, oY)
+    if not nX or not nY or not oX or not oY then
+        return 999999
+    end
     return sqrt((nX - oX) * (nX - oX) + (nY - oY) * (nY - oY))
 end
 

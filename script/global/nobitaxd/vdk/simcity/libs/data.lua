@@ -125,29 +125,31 @@ function loadMap()
                 local nodeName = col[1]
 
                 local x, y = nodeNameToCoords(nodeName)
-                if i == 1 then
-                    world.firstNode = {x, y}
-                end
-                local linkedNodes = split(col[2], ",")
-                local isExact = col[3]
-                local nodeType = col[4]
-                
-                allNodes[nodeName] = {
-                    x = x,
-                    y = y,
-                    linkedNodes = linkedNodes, 
-                    isExact = isExact, 
-                    nodeType = nodeType, -- 0: normal, 1: war
-                    isNearAtraction = 0,
-                    isNotPreset = 1
-                }
+                if x and y then
+                    if i == 1 then
+                        world.firstNode = {x, y}
+                    end
+                    local linkedNodes = split(col[2], ",")
+                    local isExact = col[3]
+                    local nodeType = col[4]
+                    
+                    allNodes[nodeName] = {
+                        x = x,
+                        y = y,
+                        linkedNodes = linkedNodes, 
+                        isExact = isExact, 
+                        nodeType = nodeType, -- 0: normal, 1: war
+                        isNearAtraction = 0,
+                        isNotPreset = 1
+                    }
 
-                if mapAtractions[worldId] then
-                    for j=1, getn(mapAtractions[worldId]) do
-                        local atraction = mapAtractions[worldId][j]
-                        if GetDistanceRadius(x, y, atraction[1], atraction[2]) < 8 then
-                            allNodes[nodeName].isNearAtraction = atraction[3]
-                            break
+                    if mapAtractions[worldId] then
+                        for j=1, getn(mapAtractions[worldId]) do
+                            local atraction = mapAtractions[worldId][j]
+                            if GetDistanceRadius(x, y, atraction[1], atraction[2]) < 8 then
+                                allNodes[nodeName].isNearAtraction = atraction[3]
+                                break
+                            end
                         end
                     end
                 end
@@ -165,7 +167,7 @@ function loadMap()
             local _dtx, _dty
             if mapAtractions[worldId] then
                 for j=1, getn(mapAtractions[worldId]) do
-                    if mapAtractions[worldId][j][4] == "D· TÈu" then _dtx = mapAtractions[worldId][j][1]; _dty = mapAtractions[worldId][j][2]; break end
+                    if mapAtractions[worldId][j][4] == "D Tu" then _dtx = mapAtractions[worldId][j][1]; _dty = mapAtractions[worldId][j][2]; break end
                 end
             end
             local dtnodes = {}
