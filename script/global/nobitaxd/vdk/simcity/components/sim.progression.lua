@@ -342,15 +342,33 @@ SimProgression.FACTION_SKILLS = {
     }
 }
 
--- 5. BANG TRA CUU KY CHIEN (HorseLimit >= 1 from settings/skills.txt)
-Include("\\script\\global\\nobitaxd\\vdk\\simcity\\components\\sim.horse_skills.lua")
-if not SimProgression.HORSE_SKILLS then
-    SimProgression.HORSE_SKILLS = {}
-end
+-- 5. KY CHIEN / RANGE: authoritative SimSkillMeta from settings/skills.txt
+Include("\\script\\global\\nobitaxd\\vdk\\simcity\\components\\sim.skill_meta.lua")
 
 function SimProgression:CanCastOnHorse(skillId)
+    if SimSkillMeta and SimSkillMeta.CanCastOnHorse then
+        return SimSkillMeta:CanCastOnHorse(skillId)
+    end
     if not skillId or skillId <= 0 then return 0 end
-    return self.HORSE_SKILLS[skillId] or 0
+    return 0
+end
+
+function SimProgression:GetSkillAttackRadius(skillId)
+    if SimSkillMeta and SimSkillMeta.GetAttackRadiusPixels then
+        return SimSkillMeta:GetAttackRadiusPixels(skillId)
+    end
+    if not skillId then return 64 end
+    return self.SKILL_ATTACK_RADIUS[skillId] or 64
+end
+
+function SimProgression:GetSkillAttackRadiusTiles(skillId)
+    if SimSkillMeta and SimSkillMeta.GetAttackRadiusTiles then
+        return SimSkillMeta:GetAttackRadiusTiles(skillId)
+    end
+    local px = self:GetSkillAttackRadius(skillId)
+    local tiles = floor(px / 32)
+    if tiles < 1 then tiles = 1 end
+    return tiles
 end
 
 -- 6. TINH TOAN CAP DO SKILL THEO CAP NHAN VAT
@@ -1560,19 +1578,11 @@ SimProgression.SKILL_ATTACK_RADIUS = {
     [1731] = 180,
 }
 
-function SimProgression:GetSkillAttackRadius(skillId)
-    if not skillId then return 90 end
-    return self.SKILL_ATTACK_RADIUS[skillId] or 90
-end
-
-function SimProgression:GetSkillAttackRadiusTiles(skillId)
-    local px = self:GetSkillAttackRadius(skillId)
-    local tiles = floor(px / 32)
-    if tiles < 1 then tiles = 1 end
-    return tiles
-end
-
 function SimProgression:IsMeleeSkill(skillId)
+    if SimSkillMeta and SimSkillMeta.Get then
+        local m = SimSkillMeta:Get(skillId)
+        if m then return m.melee == 1 or (m.tiles or 99) <= 3 end
+    end
     local px = self:GetSkillAttackRadius(skillId)
     return px <= 120
 end

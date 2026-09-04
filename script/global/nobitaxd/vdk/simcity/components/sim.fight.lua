@@ -141,22 +141,25 @@ function SimApplyHorseCombat(tbNpc, skillId)
     end
 
     local canHorse = 0
-    if SimProgression and SimProgression.CanCastOnHorse then
+    if SimSkillMeta and SimSkillMeta.CanCastOnHorse then
+        canHorse = SimSkillMeta:CanCastOnHorse(skillId)
+    elseif SimProgression and SimProgression.CanCastOnHorse then
         canHorse = SimProgression:CanCastOnHorse(skillId)
     end
 
     if canHorse == 0 then
-        -- Skill bo chien: Xuong ngua
+        -- DEFAULT DENY: dismount BEFORE cast
         if SetNpcRideHorse and tbNpc.isCurrentlyRiding ~= 0 then
             SetNpcRideHorse(tbNpc.finalIndex, 0)
         end
         tbNpc.isCurrentlyRiding = 0
+        tbNpc.lastRideWant = 0
     else
-        -- Skill ky chien: Len ngua
         if SetNpcRideHorse and tbNpc.isCurrentlyRiding ~= 1 then
             SetNpcRideHorse(tbNpc.finalIndex, 1)
         end
         tbNpc.isCurrentlyRiding = 1
+        tbNpc.lastRideWant = 1
     end
 end
 
@@ -274,7 +277,9 @@ function execCastNormalSkill(self, simInstance, tbNpc)
     local myTileY = floor(myY32 / 32)
 
     local maxCastTiles = 2
-    if SimProgression and SimProgression.GetSkillAttackRadiusTiles then
+    if SimSkillMeta and SimSkillMeta.GetAttackRadiusTiles then
+        maxCastTiles = SimSkillMeta:GetAttackRadiusTiles(skillId)
+    elseif SimProgression and SimProgression.GetSkillAttackRadiusTiles then
         maxCastTiles = SimProgression:GetSkillAttackRadiusTiles(skillId)
     end
     local maxChaseTiles = SIMBOT_CHASE_MAX_TILES or 20
@@ -289,7 +294,14 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         return
     end
 
-    local isRanged = SimFight:IsRangedFaction(tbNpc.faction, tbNpc.weaponBranch)
+    local isRanged = 0
+    if SimSkillMeta and SimSkillMeta.Get then
+        local meta = SimSkillMeta:Get(skillId)
+        if meta and meta.melee ~= 1 and (meta.tiles or 0) >= 6 then isRanged = 1 end
+    end
+    if isRanged == 0 then
+        isRanged = SimFight:IsRangedFaction(tbNpc.faction, tbNpc.weaponBranch)
+    end
 
     -- Tactical kiting: If ranged bot and target is closer than 4 tiles
     if isRanged == 1 and target.dist < 4 and tbNpc.tongkim ~= 1 then
@@ -310,7 +322,7 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         return
     end
 
-    -- Cast skill combo
+    -- Cast skill combo: horse state then SAME pending skill
     SimFight:SetCombatState(tbNpc, SIM_COMBAT_STATE.COMBO, "casting combo")
     if SimMovement then SimMovement:SetState(tbNpc, SIM_MOVE_STATE.IDLE, "casting combo stationary") end
     SimApplyHorseCombat(tbNpc, skillId)
@@ -321,6 +333,7 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         else
             NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, target.worldX, target.worldY)
         end
+        if SimCommitSkillToggle then SimCommitSkillToggle(tbNpc) end
         local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
         tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
         if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, target.targetId, "player") end
@@ -329,6 +342,7 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         end
     else
         NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, target.worldX, target.worldY)
+        if SimCommitSkillToggle then SimCommitSkillToggle(tbNpc) end
         local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
         tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
         if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, target.targetId, "npc") end
@@ -800,12 +814,19 @@ SimFight.KeoXe = {
             if mode == 1 then 
                 SetNpcKind(tbNpc.finalIndex, 0)
             else
-                SetNpcKind(tbNpc.finalIndex, tbNpc.kind or 4)
+                if tbNpc.mode == "train" or tbNpc.isAttackable == 1 then
+                    SetNpcKind(tbNpc.finalIndex, 0)
+                else
+                    SetNpcKind(tbNpc.finalIndex, tbNpc.kind or 4)
+                end
             end
             return 1
         end
 
-        if tbNpc.isPlayerFighting == 0 then
+        -- Combat bots stay kind=0 so players can PK them; kind=4 = unattackable NPC mode
+        if tbNpc.mode == "train" or tbNpc.tongkim == 1 or tbNpc.isAttackable == 1 then
+            SetNpcKind(tbNpc.finalIndex, 0)
+        elseif tbNpc.isPlayerFighting == 0 then
             SetNpcKind(tbNpc.finalIndex, 0)
         else
             SetNpcKind(tbNpc.finalIndex, tbNpc.kind or 4)

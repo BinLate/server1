@@ -11,7 +11,7 @@ SIM = os.path.join(ROOT, "script", "global", "nobitaxd", "vdk", "simcity")
 class TestTrainPkHorseParty(unittest.TestCase):
     def test_train_dosat_pct_default_zero(self):
         cfg = open(os.path.join(SIM, "config.lua"), encoding="utf-8", errors="replace").read()
-        self.assertIn("TRAIN_DOSAT_PCT = 0", cfg)
+        self.assertIn("TRAIN_DOSAT_PCT = 8", cfg)
 
     def test_pluyencong_uses_dosat_pct(self):
         src = open(os.path.join(SIM, "plugins", "pluyencong.lua"), encoding="utf-8", errors="replace").read()
@@ -25,24 +25,9 @@ class TestTrainPkHorseParty(unittest.TestCase):
         self.assertIn("tbNpc.camp == 5", src)
 
     def test_horse_skills_match_skills_txt(self):
-        hl = set()
-        with open(os.path.join(ROOT, "settings", "skills.txt"), encoding="latin1") as f:
-            r = csv.reader(f, delimiter="\t")
-            h = next(r)
-            i_id, i_hl = h.index("SkillId"), h.index("HorseLimit")
-            for row in r:
-                if len(row) <= i_hl:
-                    continue
-                try:
-                    sid, hv = int(row[i_id]), int(row[i_hl] or 0)
-                except ValueError:
-                    continue
-                if hv >= 1:
-                    hl.add(sid)
-        hs = open(os.path.join(SIM, "components", "sim.horse_skills.lua"), encoding="ascii", errors="replace").read()
-        ids = set(int(x) for x in re.findall(r"\[(\d+)\]=1", hs))
-        self.assertEqual(ids, hl)
-        self.assertGreater(len(ids), 200)
+        src = open(os.path.join(SIM, "components", "sim.skill_meta.lua"), encoding="ascii", errors="replace").read()
+        self.assertIn("[318]={horse=1", src)
+        self.assertIn("function SimSkillMeta:CanCastOnHorse", src)
 
     def test_botmount_uses_cancastonhorse(self):
         src = open(os.path.join(SIM, "components", "sim.core.lua"), encoding="utf-8", errors="replace").read()

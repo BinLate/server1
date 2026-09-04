@@ -160,7 +160,12 @@ function execCreateChar(self, simInstance, tbNpc, isNew, goX32, goY32)
                 if tbNpc.isFighting == 1 then
                     SetNpcKind(nNpcIndex, 0)
                 else
-                    SetNpcKind(nNpcIndex, tbNpc.kind or 0)
+                    -- Train/TK combat bots stay kind=0 (player-attackable); others may use configured kind
+                    if tbNpc.mode == "train" or tbNpc.tongkim == 1 or tbNpc.isAttackable == 1 then
+                        SetNpcKind(nNpcIndex, 0)
+                    else
+                        SetNpcKind(nNpcIndex, tbNpc.kind or 0)
+                    end
                 end
               
                 if (tbNpc.isFighting == 0) then

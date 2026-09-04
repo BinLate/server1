@@ -37,7 +37,7 @@ TONGKIM_SPAWN_MAXSTAY = 1        -- thoi gian toi da co the nup trong dai doanh
 SIMBOT_TRAIN_START_LEVEL = 10     -- cap khoi tao bot train moi (chua co roster)
 TRAIN_BOT_MAX_PER_MAP = 25        -- so luong bot toi da tren 1 map luyen cong
 TRAIN_BOT_GLOBAL_BUDGET = 200     -- tong ngan sach Simbot luyen cong toan server
-TRAIN_DOSAT_PCT = 0               -- % bot train spawn Do Sat (camp5); 0 = chi luyen quai, khong pha bai player
+TRAIN_DOSAT_PCT = 8               -- % bot train Do Sat (camp5) attack players; rest peaceful grind only
 AOI_SCAN_INTERVAL = 15            -- chu ky quet nguoi choi (giay)
 AOI_HIBERNATE_TIMEOUT = 120       -- thoi gian khong co nguoi choi se hibernate (giay)
 
