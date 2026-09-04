@@ -14,8 +14,9 @@ SimCityLuyenCong = {
 }
 
 SimCityLuyenCong.TRAIN_MAPS = {
-    -- mapId must match settings/global/vdk/simcity/maps/thanhthi.txt (NOT city IDs)
-    [1] = { name = "Ba Lang Huyen (1-20)", mapId = 53, minLv = 1, maxLv = 20, count = 15 },
+    -- mapId must match settings/.../thanhthi.txt
+    -- Do NOT use Ba Lang (53) / cities / thon stall maps — those keep thanhthi/stall spawn
+    [1] = { name = "Kim Quang Dong (1-20)", mapId = 4, minLv = 1, maxLv = 20, count = 15 },
     [2] = { name = "Phuc Nguu Son Tay (20-40)", mapId = 41, minLv = 20, maxLv = 40, count = 18 },
     [3] = { name = "Kinh Hoang Dong (40-60)", mapId = 5, minLv = 40, maxLv = 60, count = 20 },
     [4] = { name = "Lam Du Quan (60-80)", mapId = 319, minLv = 60, maxLv = 80, count = 20 },
@@ -151,7 +152,6 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
         if savedBot and savedBot.level then
             lv = savedBot.level
         else
-            -- New bot: startLv on early maps; otherwise map minLv (migrated tier fill)
             if m.minLv <= startLv then
                 lv = startLv
             else
@@ -162,6 +162,9 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
         end
         local nExp = (savedBot and savedBot.nExp) or 0
         local szName = (savedBot and savedBot.szName) or nil
+        if (not szName) or szName == "" or (strfind and strfind(szName, "Temple")) then
+            szName = SimCityNPCInfo:generateName()
+        end
         local faction = (savedBot and savedBot.faction) or nil
         local series = (savedBot and savedBot.series) or nil
         local weaponBranch = (savedBot and savedBot.weaponBranch) or nil
@@ -178,22 +181,27 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
             level = lv,
             nExp = nExp,
             szName = szName,
+            hardsetName = szName,
             faction = faction,
             series = series,
             weaponBranch = weaponBranch,
             personality = personality,
             camp = camp,
-            isFighting = 1,
+            isFighting = 0,
             walkMode = "random",
             walkVar = 5,
             noRevive = 0,
             capHP = cap,
             ngoaitrang = 1,
             CHANCE_ATTACK_PLAYER = (isDoSat and 1) or 0,
-            CHANCE_ATTACK_NPC = (isDoSat and 1) or 0,
+            -- Must be >1 so Case3 can start a fight alone (see sim.movement)
+            CHANCE_ATTACK_NPC = 2,
             CHANCE_JOIN_FIGHT = 1,
-            RADIUS_FIGHT_PLAYER = (isDoSat and 20) or 10,
-            RADIUS_FIGHT_NPC = (isDoSat and 20) or 10
+            RADIUS_FIGHT_PLAYER = (isDoSat and 20) or 15,
+            RADIUS_FIGHT_NPC = (isDoSat and 20) or 15,
+            RADIUS_FIGHT_SCAN = 20,
+            leaveFightWhenNoEnemy = 0,
+            noStop = 1
         }
 
         local nListId = SimCitizen:New(tbNpc)

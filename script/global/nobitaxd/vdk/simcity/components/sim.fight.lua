@@ -511,7 +511,13 @@ SimFight.Citizen = {
             if allNpcs[i] ~= tbNpc.finalIndex then
                 local fighter2Kind = GetNpcKind(allNpcs[i])
                 local fighter2Camp = GetNpcCurCamp(allNpcs[i])
-                if fighter2Kind == 0 and ((tbNpc.mode == "train" and GetNpcParam(allNpcs[i], 4) ~= 1) or (IsAttackableCamp(tbNpc.camp, fighter2Camp) == 1)) then  
+                -- Skip other simbots (param 4 == 1)
+                if GetNpcParam(allNpcs[i], 4) == 1 then
+                    -- skip
+                elseif tbNpc.mode == "train" then
+                    -- Train: grind any non-simbot NPC (player-like kind0 or monster kind1+)
+                    return allNpcs[i]
+                elseif fighter2Kind == 0 and IsAttackableCamp(tbNpc.camp, fighter2Camp) == 1 then
                     return allNpcs[i]
                 end
             end

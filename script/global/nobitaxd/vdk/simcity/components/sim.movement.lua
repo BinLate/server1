@@ -931,7 +931,7 @@ SimMovement.Citizen = {
         if ((SimCityCanFight(tbNpc) == 1) and   -- [2026-06-26] BO 'or selfDefTick': SimCityCanFight da lo self-def NGOAI thanh (1) + HOA BINH trong thanh (0); bypass cu -> tu ve trong thanh -> cascade
             (tbNpc.isFighting == 0 and tbNpc.tick_canswitch < tbNpc.tick_breath)) then
             
-            if (tbNpc.isAttractionAround == 0)then
+            if (tbNpc.isAttractionAround == 0 or tbNpc.mode == "train") then
                 -- [2026-06-23] UU TIEN PLAYER: ~25% bot gan player khac camp nham PLAYER truoc (con lai danh NPC nhu cu)
                 if tbNpc.isPlayerEnemyAround and tbNpc.isPlayerEnemyAround > 0 and random(1, 100) <= (CHANCE_PREFER_PLAYER or 25) then
                     if tbNpc.fightSys:TriggerFightWithPlayer(simInstance, tbNpc) == 1 then return 1 end
@@ -960,8 +960,8 @@ SimMovement.Citizen = {
 
                     local countFighting = tbNpc.fightSys:GetFightingNPCs(simInstance, tbNpc, myPosX, myPosY)
 
-                    -- If someone is around or I am not crazy then I fight
-                    if countFighting > 0 or tbNpc.CHANCE_ATTACK_NPC > 1 then
+                    -- Train bots always start alone; CHANCE>1 = "crazy" start alone for others
+                    if countFighting > 0 or tbNpc.CHANCE_ATTACK_NPC > 1 or tbNpc.mode == "train" then
                         countFighting = countFighting + 1
                         tbNpc.fightSys:JoinFight(simInstance, tbNpc, "I start a fight")
                     end

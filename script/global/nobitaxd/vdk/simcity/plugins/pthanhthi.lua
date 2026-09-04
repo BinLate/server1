@@ -521,6 +521,11 @@ function SimCityThanhThi:createNpcSoCapByMap(worldId)
 				SimCityLuyenCong:spawnForMap(trainIdx)
 				return
 			end
+			-- Non-train map: purge leftover train bots so stall/city can respawn
+			if SimCitizen and SimCitizen.ClearMap then
+				SimCitizen:ClearMap(nW, "train")
+			end
+			worldInfo.isTrainMap = 0
 		end
 
 		local tmpFound = {}
