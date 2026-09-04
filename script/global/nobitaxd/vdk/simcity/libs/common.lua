@@ -495,7 +495,8 @@ function SimCityCanFight(tbNpc)
     end
     local _pe = tbNpc.isPlayerEnemyAround
     local _peCD = _pe and _pe > 0 and (not GetPlayerPkMode or not PIdx2NpcIdx or GetPlayerPkMode(PIdx2NpcIdx(_pe)) ~= 0)
-    if tbNpc.mode ~= "train" and not (tbNpc.tongkim == 1 and tbNpc.worldInfo and tbNpc.worldInfo.tkWarStarted == 1) and not _peCD and not tbNpc.duelPlayerId then return 0 end  
+	local outdoorOk = (wi.allowFighting == 1 and wi.cityPeace ~= 1)
+    if tbNpc.mode ~= "train" and not (tbNpc.tongkim == 1 and tbNpc.worldInfo and tbNpc.worldInfo.tkWarStarted == 1) and not _peCD and not tbNpc.duelPlayerId and not outdoorOk then return 0 end  
     if tbNpc.selfDefTick and tbNpc.tick_breath and tbNpc.selfDefTick > tbNpc.tick_breath then return 1 end
     if tbNpc.tongkim == 1 and tbNpc.worldInfo and tbNpc.worldInfo.tkWarStarted ~= 1 then return 0 end  
     if wi.cityPeace == 1 then return 1 end                                   

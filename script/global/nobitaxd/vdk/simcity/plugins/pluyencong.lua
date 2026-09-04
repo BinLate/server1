@@ -15,16 +15,17 @@ SimCityLuyenCong = {
 
 SimCityLuyenCong.TRAIN_MAPS = {
     -- mapId must match settings/.../thanhthi.txt
-    -- Do NOT use Ba Lang (53) / cities / thon stall maps — those keep thanhthi/stall spawn
+    -- Do NOT use Ba Lang (53) / cities / thon stall maps
     [1] = { name = "Kim Quang Dong (1-20)", mapId = 4, minLv = 1, maxLv = 20, count = 15 },
     [2] = { name = "Phuc Nguu Son Tay (20-40)", mapId = 41, minLv = 20, maxLv = 40, count = 18 },
     [3] = { name = "Kinh Hoang Dong (40-60)", mapId = 5, minLv = 40, maxLv = 60, count = 20 },
-    [4] = { name = "Lam Du Quan (60-80)", mapId = 319, minLv = 60, maxLv = 80, count = 20 },
-    [5] = { name = "Dao Hoa Nguyen (80-90)", mapId = 55, minLv = 80, maxLv = 90, count = 22 },
-    [6] = { name = "Truong Bach Son Nam (90-120)", mapId = 321, minLv = 90, maxLv = 120, count = 25 },
-    [7] = { name = "Mac Bac Thao Nguyen (120-150)", mapId = 341, minLv = 120, maxLv = 150, count = 25 },
-    [8] = { name = "Sa Mac Tang 1 (150-180)", mapId = 225, minLv = 150, maxLv = 180, count = 25 },
-    [9] = { name = "Vi Son Dao (180-200)", mapId = 342, minLv = 180, maxLv = 200, count = 25 }
+    [4] = { name = "Vu Lang Dong (50-80)", mapId = 199, minLv = 50, maxLv = 80, count = 20 },
+    [5] = { name = "Lam Du Quan (60-80)", mapId = 319, minLv = 60, maxLv = 80, count = 20 },
+    [6] = { name = "Dao Hoa Nguyen (80-90)", mapId = 55, minLv = 80, maxLv = 90, count = 22 },
+    [7] = { name = "Truong Bach Son Nam (90-120)", mapId = 321, minLv = 90, maxLv = 120, count = 25 },
+    [8] = { name = "Mac Bac Thao Nguyen (120-150)", mapId = 341, minLv = 120, maxLv = 150, count = 25 },
+    [9] = { name = "Sa Mac Tang 1 (150-180)", mapId = 225, minLv = 150, maxLv = 180, count = 25 },
+    [10] = { name = "Vi Son Dao (180-200)", mapId = 342, minLv = 180, maxLv = 200, count = 25 }
 }
 
 -- PK / Chat shouts for Do Sat (Camp 5) bots

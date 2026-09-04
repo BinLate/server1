@@ -975,6 +975,11 @@ SimMovement.Citizen = {
                         if tbNpc.fightSys:TriggerFightWithNPC(simInstance, tbNpc) == 1 then
                             return 1
                         end
+                    elseif tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1 then
+                        -- Outdoor grind (e.g. Vu Lang Dong): hunt monsters
+                        if tbNpc.fightSys:TriggerFightWithNPC(simInstance, tbNpc) == 1 then
+                            return 1
+                        end
                     elseif countFighting > 0 or tbNpc.CHANCE_ATTACK_NPC > 1 then
                         countFighting = countFighting + 1
                         tbNpc.fightSys:JoinFight(simInstance, tbNpc, "I start a fight")

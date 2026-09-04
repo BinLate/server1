@@ -495,7 +495,9 @@ SimFight.Citizen = {
     execCastOnParent = execCastOnParent,
     execCastOnSelf = execCastOnSelf,    
     TriggerFightWithNPC = function(self, simInstance, tbNpc)       
-        if tbNpc.isPlayerFighting == 0 and tbNpc.mode ~= "train" and tbNpc.tongkim ~= 1 then   
+        -- Allow train / tongkim / outdoor grind / player-fighting
+        local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+        if tbNpc.isPlayerFighting == 0 and tbNpc.mode ~= "train" and tbNpc.tongkim ~= 1 and not outdoorOk then   
             return 0
         end
         local enemy = self:IsNpcEnemyAround(simInstance, tbNpc)
@@ -509,19 +511,23 @@ SimFight.Citizen = {
         local allNpcs = {}
         local nCount = 0
         local radius = tbNpc.RADIUS_FIGHT_SCAN or RADIUS_FIGHT_SCAN
+        if tbNpc.mode == "train" or (tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1) then
+            radius = tbNpc.RADIUS_FIGHT_SCAN or 20
+        end
 
-        -- Thanh thi / tong kim / chien loan
         allNpcs, nCount = GetNpcAroundNpcList(tbNpc.finalIndex, radius)
+        if not allNpcs or not nCount then return 0 end
         for i = 1, nCount do
             if allNpcs[i] ~= tbNpc.finalIndex then
                 local fighter2Kind = GetNpcKind(allNpcs[i])
                 local fighter2Camp = GetNpcCurCamp(allNpcs[i])
-                -- Skip other simbots (param 4 == 1)
-                if GetNpcParam(allNpcs[i], 4) == 1 then
-                    -- skip
-                elseif tbNpc.mode == "train" then
-                    -- Train: grind any non-simbot NPC (player-like kind0 or monster kind1+)
-                    return allNpcs[i]
+                if GetNpcParam and GetNpcParam(allNpcs[i], 4) == 1 then
+                    -- skip other simbots
+                elseif tbNpc.mode == "train" or (tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1) then
+                    -- Grind maps: any non-simbot NPC/monster
+                    if fighter2Kind ~= nil then
+                        return allNpcs[i]
+                    end
                 elseif fighter2Kind == 0 and IsAttackableCamp(tbNpc.camp, fighter2Camp) == 1 then
                     return allNpcs[i]
                 end
@@ -637,7 +643,18 @@ SimFight.Citizen = {
             end
         end
         
-        if tbNpc.mode == "train" then self:SetFightState(tbNpc, 9, currX, currY); return 1 end   
+        local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+        if tbNpc.mode == "train" or outdoorOk then
+            self:SetFightState(tbNpc, 9, currX, currY)
+            if tbNpc.foundNpcEnemy and tbNpc.foundNpcEnemy > 0 then
+                local _ex, _ey = GetNpcPos(tbNpc.foundNpcEnemy)
+                if _ex and NpcRun then
+                    NpcRun(tbNpc.finalIndex, floor(_ex/32), floor(_ey/32))
+                end
+            end
+            if self.Update then self:Update(simInstance, tbNpc) end
+            return 1
+        end
         tbNpc.entitySys:Respawn(simInstance, tbNpc, 3, "JoinFight " .. reason)      
         return 1
     end,
