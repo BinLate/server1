@@ -236,7 +236,7 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         return
     end
 
-    if tbNpc.isPlayerEnemyAround == 0 and (random(1, 1000) > 50) then
+    if tbNpc.isPlayerEnemyAround == 0 and tbNpc.mode ~= "train" and (random(1, 1000) > 50) then
         return
     end
 
@@ -696,9 +696,11 @@ SimFight.Citizen = {
                 if (GetDistanceRadius(tbNpc.lastFightPos.X/32, tbNpc.lastFightPos.Y/32, currX/32, currY/32) < 16) then
                     local outdoorOkFast = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
                     if tbNpc.mode == "train" or outdoorOkFast then
-                        self:SetFightState(tbNpc, 0, currX, currY)
+                        -- goc: engine AI (mode 9->1) hunts/casts. Mode 0 = idle statues if Lua scan misses.
+                        local sk = SimPickSkill and SimPickSkill(tbNpc)
+                        if sk and sk[1] and SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
+                        self:SetFightState(tbNpc, 9, currX, currY)
                         if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
-                        if self.Update then self:Update(simInstance, tbNpc) end
                     else
                         self:SetFightState(tbNpc, 9, currX, currY)
                     end
@@ -709,20 +711,13 @@ SimFight.Citizen = {
         
         local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
         if tbNpc.mode == "train" or outdoorOk then
-            -- AI mode 0: Lua owns cast + horse. Mode 1 engine AI casts while mounted and breaks FOOT skills.
-            self:SetFightState(tbNpc, 0, currX, currY)
+            -- CRITICAL: train/outdoor MUST use engine AI (9->1) like server1-goc.
+            -- Mode 0 + Lua-only cast was leaving bots idle next to monsters (no GetNpcAroundNpcList hit / 5% cast gate).
+            -- Horse: align mount state BEFORE enabling AI so FOOT skills are not cast while mounted.
+            local sk = SimPickSkill and SimPickSkill(tbNpc)
+            if sk and sk[1] and SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
+            self:SetFightState(tbNpc, 9, currX, currY)
             if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
-            if (not tbNpc.foundNpcEnemy) or tbNpc.foundNpcEnemy <= 0 then
-                local e = self:IsNpcEnemyAround(simInstance, tbNpc)
-                if e and e > 0 then tbNpc.foundNpcEnemy = e end
-            end
-            if tbNpc.foundNpcEnemy and tbNpc.foundNpcEnemy > 0 then
-                local _ex, _ey = GetNpcPos(tbNpc.foundNpcEnemy)
-                if _ex and NpcRun then
-                    NpcRun(tbNpc.finalIndex, floor(_ex/32), floor(_ey/32))
-                end
-            end
-            if self.Update then self:Update(simInstance, tbNpc) end
             return 1
         end
         tbNpc.entitySys:Respawn(simInstance, tbNpc, 3, "JoinFight " .. reason)      

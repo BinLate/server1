@@ -935,13 +935,17 @@ SimMovement.Citizen = {
                 end
             end
  
-            -- Train/outdoor: keep casting while fighting
+            -- Train/outdoor: engine AI (mode 1 from JoinFight) hunts; Lua Update is backup + horse realign
             local outdoorCast = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
-            if (tbNpc.mode == "train" or outdoorCast) and tbNpc.fightSys and tbNpc.fightSys.Update then
+            if (tbNpc.mode == "train" or outdoorCast) and tbNpc.fightSys then
+                local sk = SimPickSkill and SimPickSkill(tbNpc)
+                if sk and sk[1] and SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
                 local _e2 = tbNpc.fightSys:IsNpcEnemyAround(simInstance, tbNpc)
                 if _e2 and _e2 > 0 then
                     tbNpc.foundNpcEnemy = _e2
-                    tbNpc.fightSys:Update(simInstance, tbNpc)
+                    if tbNpc.fightSys.Update then
+                        tbNpc.fightSys:Update(simInstance, tbNpc)
+                    end
                 end
             end
 
