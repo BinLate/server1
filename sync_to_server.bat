@@ -7,11 +7,13 @@ set "SRC=%~dp0"
 if "%SRC:~-1%"=="\" set "SRC=%SRC:~0,-1%"
 set "DST=\\192.168.1.188\jxser\server1"
 
-:: Danh sach thu muc bo qua (khong can copy)
-set "EXCLUDE_DIRS=.git .agents .brain Logs dulieu itemexchange_setting rolevalueladder_setting worldrank font servershutdown_log pak data"
+:: Danh sach thu muc bo qua (khong sync sang game server)
+:: - Dev/agent: .git .agents .ai .brain .pytest_cache plans tests tools scripts
+:: - Runtime local / binary da co san tren Linux: Logs dulieu pak data font ...
+set "EXCLUDE_DIRS=.git .agents .ai .brain .pytest_cache .github __pycache__ plans tests tools scripts gemini-and-chatgpt upstream_simcity Logs dulieu itemexchange_setting rolevalueladder_setting worldrank font servershutdown_log pak data"
 
 :: Danh sach file bo qua
-set "EXCLUDE_FILES=*.tmp *.log sync_to_server.bat *.py *.bak 192.168.1.188"
+set "EXCLUDE_FILES=*.tmp *.log *.py *.pyc *.bak *.md *.pdf .gitignore sync_to_server.bat 192.168.1.188 requirements-test.txt checks.json chatgpt_response_*.txt AGENTS.md CHANGELOG.md PROJECT_MAP.md"
 
 :menu
 cls
