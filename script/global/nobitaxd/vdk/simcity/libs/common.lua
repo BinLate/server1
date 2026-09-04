@@ -351,8 +351,11 @@ function nodeNameToCoords(nodeName)
     if nodeName == "" then
         return nil, nil
     end
+    -- Do NOT use getn(point): Kingsoft split() assigns by index without
+    -- setn/tinsert, so getn can be 0 even when point[1]/point[2] are valid.
+    -- That false-negative dropped every preset node (console spam).
     local point = split(nodeName, "_")
-    if (not point) or getn(point) ~= 2 then
+    if (not point) or (point[1] == nil) or (point[2] == nil) or (point[3] ~= nil) then
         return nil, nil
     end
     local x = tonumber(SimCityTrimCell(point[1]))

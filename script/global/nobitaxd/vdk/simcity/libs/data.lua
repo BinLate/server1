@@ -260,7 +260,12 @@ function loadMap()
                     local nodeName = preset[i]
                     local x, y = nodeNameToCoords(nodeName)
                     if (not x) or (not y) then
-                        print("loadMap: drop invalid preset node world="..tostring(worldId).." path="..tostring(presetName).." node="..tostring(nodeName))
+                        -- rare: truly unparsable waypoint (keep log quiet after first few)
+                        if not _SIMCITY_DROP_NODE_LOG then _SIMCITY_DROP_NODE_LOG = 0 end
+                        if _SIMCITY_DROP_NODE_LOG < 5 then
+                            _SIMCITY_DROP_NODE_LOG = _SIMCITY_DROP_NODE_LOG + 1
+                            print("loadMap: drop invalid preset node world="..tostring(worldId).." path="..tostring(presetName).." node="..tostring(nodeName))
+                        end
                     else
                         -- canonical key without CR/spaces so preset matches nodes table
                         local canonName = format("%d_%d", x, y)

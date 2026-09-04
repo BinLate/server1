@@ -19,8 +19,10 @@ class TestNodeCoordSanitization(unittest.TestCase):
 
     def test_nodename_requires_two_numeric_parts(self):
         src = open(COMMON, 'rb').read().decode('latin-1')
-        # Contract: reject ~= 2 parts after split on _
-        self.assertIn('getn(point) ~= 2', src)
+        # Must NOT rely on getn(point) — Kingsoft split skips setn.
+        self.assertNotIn('getn(point) ~= 2', src)
+        self.assertIn('point[1] == nil', src)
+        self.assertIn('point[2] == nil', src)
         self.assertIn('SimCityTrimCell(point[1])', src)
 
     def test_loadmap_never_links_with_raw_dx_on_maybe_nil_x(self):
