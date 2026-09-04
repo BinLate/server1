@@ -1,0 +1,107 @@
+# -*- coding: utf-8 -*-
+"""Dev-time validator for SimBot FACTION_SKILLS combat metadata."""
+from __future__ import annotations
+
+import re
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+META = ROOT / "script/global/nobitaxd/vdk/simcity/components/sim.skill_meta.lua"
+PROG = ROOT / "script/global/nobitaxd/vdk/simcity/components/sim.progression.lua"
+CORE = ROOT / "script/global/nobitaxd/vdk/simcity/components/sim.core.lua"
+HORSE = ROOT / "script/global/nobitaxd/vdk/simcity/components/sim.horse_skills.lua"
+
+
+def parse_meta(text: str):
+    out = {}
+    for m in re.finditer(r"\[(\d+)\]=\{([^}]+)\}", text):
+        sid = int(m.group(1))
+        body = m.group(2)
+        out[sid] = {
+            "horse": int(re.search(r"horse=(\d+)", body).group(1)),
+            "ar": int(re.search(r"ar=(\d+)", body).group(1)),
+            "tiles": int(re.search(r"tiles=(\d+)", body).group(1)),
+            "melee": int(re.search(r"melee=(\d+)", body).group(1)),
+            "typ": int(re.search(r"typ=(\d+)", body).group(1)),
+        }
+    return out
+
+
+def faction_skill_ids(text: str):
+    ids = set()
+    # only inside FACTION_SKILLS
+    m = re.search(r"SimProgression\.FACTION_SKILLS\s*=\s*\{", text)
+    if not m:
+        return ids
+    depth = 1
+    i = m.end()
+    while i < len(text) and depth:
+        if text[i] == "{":
+            depth += 1
+        elif text[i] == "}":
+            depth -= 1
+        i += 1
+    body = text[m.end() : i - 1]
+    for em in re.finditer(r"id\s*=\s*(\d+)", body):
+        ids.add(int(em.group(1)))
+    return ids
+
+
+def main() -> int:
+    meta = parse_meta(META.read_text(encoding="ascii", errors="replace"))
+    prog = PROG.read_text(encoding="utf-8", errors="replace")
+    core = CORE.read_text(encoding="utf-8", errors="replace")
+    horse = HORSE.read_text(encoding="utf-8", errors="replace")
+    ids = faction_skill_ids(prog)
+    errors = []
+    warns = []
+
+    if "SIMBOT_DISMOUNT_SKILLS = nil" not in core:
+        errors.append("SIMBOT_DISMOUNT_SKILLS not cleared")
+    if "SIMBOT_SKILL_RANGE = nil" not in core:
+        errors.append("SIMBOT_SKILL_RANGE not cleared")
+    if re.search(r"\[375\]\s*=\s*1", horse):
+        errors.append("legacy HORSE_SKILLS still lists 375")
+    if "HORSE_SKILLS = {}" not in horse:
+        warns.append("HORSE_SKILLS should be empty stub")
+
+    for sid in sorted(ids):
+        m = meta.get(sid)
+        if not m:
+            errors.append(f"FACTION_SKILLS id {sid} missing metadata")
+            continue
+        if m["ar"] <= 0:
+            errors.append(f"{sid}: invalid AttackRadius")
+        if m["horse"] not in (0, 1):
+            errors.append(f"{sid}: invalid horse flag")
+        if m["melee"] == 1 and m["ar"] > 256:
+            warns.append(f"{sid}: melee flag with long radius {m['ar']}")
+        if m["typ"] == 2 and m["horse"] == 1:
+            errors.append(f"{sid}: trap marked horse-allowed")
+        if m["typ"] == 3 and m["horse"] == 1:
+            errors.append(f"{sid}: support marked horse-allowed")
+
+    # Contradiction check against expected foot/mounted matrix
+    expect = {
+        318: 0, 321: 1, 322: 1, 302: 1, 342: 0, 351: 0, 355: 1,
+        361: 1, 362: 0, 368: 0, 375: 0, 323: 0, 336: 0,
+    }
+    for sid, h in expect.items():
+        m = meta.get(sid)
+        if not m or m["horse"] != h:
+            errors.append(f"matrix mismatch {sid}: want horse={h}")
+
+    print(f"checked {len(ids)} FACTION_SKILLS ids, {len(meta)} meta entries")
+    for w in warns:
+        print("WARN:", w)
+    for e in errors:
+        print("ERROR:", e)
+    if errors:
+        return 1
+    print("OK")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -245,39 +245,30 @@ function SimCore:OnDeath(nListId, nNpcIndex, attackerIndex)
 end
 
 
-SIMBOT_MELEE_SKILLS = {[318]=1,[319]=1,[322]=1,[323]=1,[325]=1,[361]=1,[368]=1}
--- Legacy blacklist removed: use SimSkillMeta:CanCastOnHorse (HorseLimit==0 may mount) instead
-SIMBOT_DISMOUNT_SKILLS = {}
+-- Authoritative combat meta: SimSkillMeta (tools/gen_skill_meta.py).
+-- Legacy multi-table horse/range lists removed (ALLOWLIST / DEFAULT-DENY).
+SIMBOT_MELEE_SKILLS = {[318]=1,[319]=1,[322]=1,[323]=1,[325]=1,[361]=1,[368]=1} -- hint only; runtime uses SimSkillMeta
+SIMBOT_DISMOUNT_SKILLS = nil -- removed; use SimSkillMeta:CanCastOnHorse == 0
 SIM_DIR8X = {1, 1, 0, -1, -1, -1, 0, 1}   
 SIM_DIR8Y = {0, 1, 1, 1, 0, -1, -1, -1}
 SIMBOT_RANGED_DIST = 12  
 SIMBOT_MELEE_DIST  = 2  
-SIMBOT_SKILL_RANGE = {  
-    [318]=2,[319]=2,[321]=12,                  -- thieulam
-    [322]=2,[323]=2,[325]=2,                   -- thienvuong (3 melee)
-    [339]=11,[342]=11,[302]=14,[351]=1,        -- duongmon (351 bom dat phu tro)
-    [353]=13,[355]=5,[72]=13,[73]=13,[390]=13, -- ngudoc (chinh + debuff)
-    [328]=11,[380]=12,                         -- ngami
-    [336]=11,[337]=7,                          -- thuyyen
-    [357]=12,[359]=12,                         -- caibang
-    [361]=1,[362]=13,                          -- thiennhan
-    [365]=14,[368]=2,                          -- vodang
-    [372]=12,[375]=14,                         -- conlon
-}
+SIMBOT_SKILL_RANGE = nil -- removed; use SimSkillMeta:GetAttackRadiusTiles
 function SimBotCastDist(tbNpc, skillId)
     local sid = skillId
     if not sid and tbNpc then
         sid = tbNpc.pendingSkillId or (tbNpc.skillCastBua and tbNpc.skillCastBua[1])
     end
     if sid and SimSkillMeta and SimSkillMeta.GetAttackRadiusTiles then
-        return SimSkillMeta:GetAttackRadiusTiles(sid)
+        local t = SimSkillMeta:GetAttackRadiusTiles(sid)
+        if t and t > 0 then return t end
     end
     if sid and SimProgression and SimProgression.GetSkillAttackRadiusTiles then
-        return SimProgression:GetSkillAttackRadiusTiles(sid)
+        local t = SimProgression:GetSkillAttackRadiusTiles(sid)
+        if t and t > 0 then return t end
     end
-    if sid and SIMBOT_SKILL_RANGE[sid] then return SIMBOT_SKILL_RANGE[sid] end
-    if sid and SIMBOT_MELEE_SKILLS[sid] then return SIMBOT_MELEE_DIST end
-    return 2
+    -- Unknown skill: force close approach (never invent long range)
+    return SIMBOT_MELEE_DIST
 end
 
 function SimPickSkill(tbNpc, noDebuff)   
@@ -304,7 +295,8 @@ function SimPickSkill(tbNpc, noDebuff)
         return sk
     end
 
-    -- Prefer horse-castable skill while mounted (peek; do not flip bua2 yet)
+    -- Prefer horse-allowlisted skill while mounted (peek; do not flip bua2 yet).
+    -- If none allowlisted, keep pending foot skill -> SimApplyHorseCombat will dismount.
     local riding = 0
     if GetNpcRideHorse and tbNpc.finalIndex and tbNpc.finalIndex > 0 then
         riding = GetNpcRideHorse(tbNpc.finalIndex) or 0
@@ -329,17 +321,10 @@ function SimPickSkill(tbNpc, noDebuff)
             if tbNpc.skillCastBua2 and tbNpc.skillCastBua2[1] and SimSkillMeta:CanCastOnHorse(tbNpc.skillCastBua2[1]) == 1 then
                 tinsert(candidates, tbNpc.skillCastBua2)
             end
-            if tbNpc.faction and SimCityPhai[tbNpc.faction] and SimCityPhai[tbNpc.faction].normalCast then
-                local nc = SimCityPhai[tbNpc.faction].normalCast
-                for i = 1, getn(nc) do
-                    if nc[i] and nc[i][1] and SimSkillMeta:CanCastOnHorse(nc[i][1]) == 1 then
-                        tinsert(candidates, nc[i])
-                    end
-                end
-            end
             if getn(candidates) > 0 then
                 sk = candidates[random(1, getn(candidates))]
             end
+            -- else keep foot skill; horse timer + SimApplyHorseCombat dismount
         end
     end
 
@@ -758,11 +743,13 @@ function SimBotDuelMove(simInstance, tbNpc)
     local myX = floor(nx32 / 32)
     local myY = floor(ny32 / 32)
     local dist = GetDistanceRadius(myX, myY, tX, tY)
-    local _castDist = SimBotCastDist(tbNpc)
+    local pending = SimPickSkill(tbNpc, 1)
+    local pendingId = pending and pending[1]
+    local _castDist = SimBotCastDist(tbNpc, pendingId)
     if SetNpcLevel and not tbNpc.botLvSet then tbNpc.botLvSet = 1; SetNpcLevel(tbNpc.finalIndex, 95) end  
     tbNpc.isFighting = 1; tbNpc.botFighting = 1   
     if SetNpcCombat and (not tbNpc.botCombatTick or tbNpc.botCombatTick <= tbNpc.tick_breath) then
-        SetNpcCombat(tbNpc.finalIndex, 1, tbNpc.skillCastBua and tbNpc.skillCastBua[1] or 0)   
+        SetNpcCombat(tbNpc.finalIndex, 1, pendingId or (tbNpc.skillCastBua and tbNpc.skillCastBua[1]) or 0)   
         tbNpc.botCombatTick = tbNpc.tick_breath + 2
     end
     SimBotTranPhai(simInstance, tbNpc)       
@@ -772,7 +759,12 @@ function SimBotDuelMove(simInstance, tbNpc)
         SetNpcAuraSkill(tbNpc.finalIndex, SimCityPhai["ngudoc"].noCast[tbNpc.skillHoTro][1], 1)
     end
     
-    local _meleeBV = (tbNpc.skillCastBua and SIMBOT_MELEE_SKILLS and SIMBOT_MELEE_SKILLS[tbNpc.skillCastBua[1]]) and true or false
+    local _meleeBV = false
+    if pendingId and SimSkillMeta and SimSkillMeta.IsMelee then
+        _meleeBV = (SimSkillMeta:IsMelee(pendingId) == 1)
+    elseif pendingId and SIMBOT_MELEE_SKILLS and SIMBOT_MELEE_SKILLS[pendingId] then
+        _meleeBV = true
+    end
     local _holdBV = _meleeBV and 1 or (_castDist - 2)
     if _holdBV < 1 then _holdBV = 1 end
     local _holdMinBV = _meleeBV and 0 or (_holdBV - 2)
@@ -787,27 +779,26 @@ function SimBotDuelMove(simInstance, tbNpc)
             NpcRun(tbNpc.finalIndex, _bx, _by)
         end
     end    
-    if _inBandBV and NpcCastSkill and SimPickSkill and (not tbNpc.botCastTick or tbNpc.botCastTick <= tbNpc.tick_breath) then
-        local sk = SimPickSkill(tbNpc, 1)  
-        if sk and sk[1] and sk[1] > 0 then
-            if SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
-            if SimSkillMeta and SimSkillMeta:CanCastOnHorse(sk[1]) ~= 1 then
-                local stillRide = 0
-                if GetNpcRideHorse then stillRide = GetNpcRideHorse(tbNpc.finalIndex) or 0 end
-                if stillRide == 1 or tbNpc.isCurrentlyRiding == 1 then
-                    if SetNpcRideHorse then SetNpcRideHorse(tbNpc.finalIndex, 0) end
-                    if BotMountSync then BotMountSync(tbNpc.finalIndex, 0) end
-                    tbNpc.isCurrentlyRiding = 0
-                    tbNpc.botCastTick = tbNpc.tick_breath + 1
-                    return 1
-                end
+    if _inBandBV and pending and pending[1] and pending[1] > 0 and (not tbNpc.botCastTick or tbNpc.botCastTick <= tbNpc.tick_breath) then
+        local sk = pending
+        if SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sk[1]) end
+        if SimSkillMeta and SimSkillMeta:CanCastOnHorse(sk[1]) ~= 1 then
+            local stillRide = 0
+            if GetNpcRideHorse then stillRide = GetNpcRideHorse(tbNpc.finalIndex) or 0 end
+            if stillRide == 1 or tbNpc.isCurrentlyRiding == 1 then
+                if SetNpcRideHorse then SetNpcRideHorse(tbNpc.finalIndex, 0) end
+                if BotMountSync then BotMountSync(tbNpc.finalIndex, 0) end
+                tbNpc.isCurrentlyRiding = 0
+                tbNpc.botCastTick = tbNpc.tick_breath + 1
+                return 1
             end
-            if SetNpcLevel then SetNpcLevel(tbNpc.finalIndex, tbNpc.level or 1) end   
-            if SetNpcAtkSpeed then SetNpcAtkSpeed(tbNpc.finalIndex, tbNpc.attackSpeed or 100) end
-            local _gd = GetNpcDoing and GetNpcDoing(tbNpc.finalIndex) or 1   
-            if _gd ~= 6 and _gd ~= 7 and BotDoSkill then BotDoSkill(tbNpc.finalIndex, sk[1], sk[2] or 20, tIdx) end  
-            tbNpc.botCastTick = tbNpc.tick_breath + 1   
         end
+        if SetNpcLevel then SetNpcLevel(tbNpc.finalIndex, tbNpc.level or 1) end   
+        if SetNpcAtkSpeed then SetNpcAtkSpeed(tbNpc.finalIndex, tbNpc.attackSpeed or 100) end
+        local _gd = GetNpcDoing and GetNpcDoing(tbNpc.finalIndex) or 1   
+        if _gd ~= 6 and _gd ~= 7 and BotDoSkill then BotDoSkill(tbNpc.finalIndex, sk[1], sk[2] or 20, tIdx) end
+        if SimCommitSkillToggle then SimCommitSkillToggle(tbNpc) end
+        tbNpc.botCastTick = tbNpc.tick_breath + 1   
     end
     return 1
 end

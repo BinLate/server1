@@ -315,6 +315,7 @@ class TestPhaseBProgression(unittest.TestCase):
         self.load_lua_file('script/global/nobitaxd/vdk/simcity/components/sim.fun.lua')
         self.load_lua_file('script/global/nobitaxd/vdk/simcity/components/sim.gear.lua')
         self.load_lua_file('script/global/nobitaxd/vdk/simcity/components/sim.party.lua')
+        self.load_lua_file('script/global/nobitaxd/vdk/simcity/components/sim.skill_meta.lua')
         self.load_lua_file('script/global/nobitaxd/vdk/simcity/components/sim.progression.lua')
         self.load_lua_file('script/global/nobitaxd/vdk/simcity/components/sim.timer.lua')
         self.load_lua_file('script/global/nobitaxd/vdk/simcity/components/sim.core.lua')
@@ -368,25 +369,25 @@ class TestPhaseBProgression(unittest.TestCase):
     def test_skill_range_and_horselimit_semantics(self):
         self.init_simcity_environment()
         res = self.lua.execute("""
-        -- Dat Ma Do Giang (318): Bo chien (HorseLimit = 0)
+        -- Dat Ma Do Giang (318): FOOT (not in horse allowlist)
         local horse_318 = SimProgression:CanCastOnHorse(318)
-        -- Vo Tuong Tram (321): Ky chien (HorseLimit = 1)
+        -- Vo Tuong Tram (321): MOUNTED (verified allowlist)
         local horse_321 = SimProgression:CanCastOnHorse(321)
 
-        -- Attack Radius lookup
-        local radTiles_melee = SimProgression:GetSkillAttackRadiusTiles(318) -- Dat Ma Do Giang (90px -> 2 tiles)
-        local radTiles_range = SimProgression:GetSkillAttackRadiusTiles(302) -- Bao Vu Le Hoa (450px -> 14 tiles)
+        -- Attack Radius: ceil(px/32) tiles
+        local radTiles_melee = SimProgression:GetSkillAttackRadiusTiles(318) -- 90px -> 3 tiles
+        local radTiles_range = SimProgression:GetSkillAttackRadiusTiles(302) -- 470px -> 15 tiles
 
         local isMelee_318 = SimProgression:IsMeleeSkill(318)
         local isMelee_302 = SimProgression:IsMeleeSkill(302)
 
-        return horse_318 == 0, horse_321 == 1, radTiles_melee, radTiles_range, isMelee_318 == true, isMelee_302 == false
+        return horse_318 == 0, horse_321 == 1, radTiles_melee, radTiles_range, isMelee_318 == 1, isMelee_302 == 0
         """)
         h318, h321, r_melee, r_range, m318, m302 = res
         self.assertTrue(h318)
         self.assertTrue(h321)
-        self.assertEqual(r_melee, 2)
-        self.assertEqual(r_range, 14)
+        self.assertEqual(r_melee, 3)
+        self.assertEqual(r_range, 15)
         self.assertTrue(m318)
         self.assertTrue(m302)
 

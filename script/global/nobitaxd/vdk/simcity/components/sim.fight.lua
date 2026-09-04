@@ -277,10 +277,18 @@ function execCastNormalSkill(self, simInstance, tbNpc)
     local myTileY = floor(myY32 / 32)
 
     local maxCastTiles = 2
-    if SimSkillMeta and SimSkillMeta.GetAttackRadiusTiles then
-        maxCastTiles = SimSkillMeta:GetAttackRadiusTiles(skillId)
+    local combatMeta = nil
+    if SimSkillMeta and SimSkillMeta.GetSkillCombatMeta then
+        combatMeta = SimSkillMeta:GetSkillCombatMeta(skillId)
+    end
+    if combatMeta and combatMeta.attackRadiusTiles then
+        maxCastTiles = combatMeta.attackRadiusTiles
+    elseif SimSkillMeta and SimSkillMeta.GetAttackRadiusTiles then
+        local t = SimSkillMeta:GetAttackRadiusTiles(skillId)
+        if t then maxCastTiles = t end
     elseif SimProgression and SimProgression.GetSkillAttackRadiusTiles then
-        maxCastTiles = SimProgression:GetSkillAttackRadiusTiles(skillId)
+        local t = SimProgression:GetSkillAttackRadiusTiles(skillId)
+        if t then maxCastTiles = t end
     end
     local maxChaseTiles = SIMBOT_CHASE_MAX_TILES or 20
 
@@ -294,13 +302,15 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         return
     end
 
+    -- Range class from THIS skill only (never faction-wide assumption)
     local isRanged = 0
-    if SimSkillMeta and SimSkillMeta.Get then
+    if combatMeta and combatMeta.skillType == "ranged" then
+        isRanged = 1
+    elseif combatMeta and combatMeta.skillType == "melee" then
+        isRanged = 0
+    elseif SimSkillMeta and SimSkillMeta.Get then
         local meta = SimSkillMeta:Get(skillId)
         if meta and meta.melee ~= 1 and (meta.tiles or 0) >= 6 then isRanged = 1 end
-    end
-    if isRanged == 0 then
-        isRanged = SimFight:IsRangedFaction(tbNpc.faction, tbNpc.weaponBranch)
     end
 
     -- Tactical kiting: If ranged bot and target is closer than 4 tiles

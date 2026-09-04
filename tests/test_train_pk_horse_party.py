@@ -33,7 +33,7 @@ class TestTrainPkHorseParty(unittest.TestCase):
     def test_botmount_uses_cancastonhorse(self):
         src = open(os.path.join(SIM, "components", "sim.core.lua"), encoding="utf-8", errors="replace").read()
         self.assertIn("CanCastOnHorse", src)
-        self.assertIn("SIMBOT_DISMOUNT_SKILLS = {}", src)
+        self.assertIn("SIMBOT_DISMOUNT_SKILLS = nil", src)
 
     def test_party_invite_helpers(self):
         src = open(os.path.join(SIM, "components", "sim.party.lua"), encoding="utf-8", errors="replace").read()

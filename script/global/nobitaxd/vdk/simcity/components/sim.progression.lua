@@ -349,24 +349,39 @@ function SimProgression:CanCastOnHorse(skillId)
     if SimSkillMeta and SimSkillMeta.CanCastOnHorse then
         return SimSkillMeta:CanCastOnHorse(skillId)
     end
-    if not skillId or skillId <= 0 then return 0 end
+    -- DEFAULT DENY
     return 0
+end
+
+function SimProgression:GetSkillCombatMeta(skillId)
+    if SimSkillMeta and SimSkillMeta.GetSkillCombatMeta then
+        return SimSkillMeta:GetSkillCombatMeta(skillId)
+    end
+    return nil
 end
 
 function SimProgression:GetSkillAttackRadius(skillId)
     if SimSkillMeta and SimSkillMeta.GetAttackRadiusPixels then
-        return SimSkillMeta:GetAttackRadiusPixels(skillId)
+        local px = SimSkillMeta:GetAttackRadiusPixels(skillId)
+        if px then return px end
     end
-    if not skillId then return 64 end
-    return self.SKILL_ATTACK_RADIUS[skillId] or 64
+    -- Do NOT invent 90px for unknown skills
+    if not skillId then return nil end
+    if self.SKILL_ATTACK_RADIUS and self.SKILL_ATTACK_RADIUS[skillId] then
+        return self.SKILL_ATTACK_RADIUS[skillId]
+    end
+    return nil
 end
 
 function SimProgression:GetSkillAttackRadiusTiles(skillId)
     if SimSkillMeta and SimSkillMeta.GetAttackRadiusTiles then
-        return SimSkillMeta:GetAttackRadiusTiles(skillId)
+        local t = SimSkillMeta:GetAttackRadiusTiles(skillId)
+        if t then return t end
     end
     local px = self:GetSkillAttackRadius(skillId)
-    local tiles = floor(px / 32)
+    if not px or px <= 0 then return nil end
+    -- ceil(px/32)
+    local tiles = floor((px + 31) / 32)
     if tiles < 1 then tiles = 1 end
     return tiles
 end
@@ -1579,10 +1594,16 @@ SimProgression.SKILL_ATTACK_RADIUS = {
 }
 
 function SimProgression:IsMeleeSkill(skillId)
+    if SimSkillMeta and SimSkillMeta.IsMelee then
+        return SimSkillMeta:IsMelee(skillId)
+    end
     if SimSkillMeta and SimSkillMeta.Get then
         local m = SimSkillMeta:Get(skillId)
-        if m then return m.melee == 1 or (m.tiles or 99) <= 3 end
+        if m and m.melee == 1 then return 1 end
+        return 0
     end
     local px = self:GetSkillAttackRadius(skillId)
-    return px <= 120
+    if not px then return 0 end
+    if px <= 120 then return 1 end
+    return 0
 end
