@@ -221,7 +221,10 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         return
     end
 
-    if tbNpc.fighting == 0 or (tbNpc.tick_canCast and tbNpc.tick_canCast > tbNpc.tick_breath) then
+    if tbNpc.fighting == 0 and tbNpc.isFighting ~= 1 then
+        return
+    end
+    if (tbNpc.tick_canCast and tbNpc.tick_canCast > tbNpc.tick_breath) then
         return
     end
 
@@ -495,7 +498,9 @@ SimFight.Citizen = {
         if tbNpc.isPlayerFighting == 0 and tbNpc.mode ~= "train" and tbNpc.tongkim ~= 1 then   
             return 0
         end
-        if (self:IsNpcEnemyAround(simInstance, tbNpc) > 0) then
+        local enemy = self:IsNpcEnemyAround(simInstance, tbNpc)
+        if enemy and enemy > 0 then
+            tbNpc.foundNpcEnemy = enemy
             return self:JoinFight(simInstance, tbNpc, "enemy around")
         end
         return 0
@@ -565,7 +570,7 @@ SimFight.Citizen = {
                         if lastPos ~= nil and lastPos ~= "none" then
                             local node = getNodeInfoByNodeName(tbNpc, lastPos)
                             Msg2Map(tbNpc.nMapId,
-                                "<color=white>" .. name .. "<color> ®¸nh ng­êi t¹i " .. tbNpc.worldInfo.name .. " " ..
+                                "<color=white>" .. name .. "<color> ??nh ng??i t?i " .. tbNpc.worldInfo.name .. " " ..
                                 floor(node.x / 8) .. " " .. floor(node.y / 16) .. "")
                         end
                     end

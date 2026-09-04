@@ -13,7 +13,7 @@ function IsActive(self, simInstance,tbNpc)
     local scanFightRadius = tbNpc.RADIUS_FIGHT_PLAYER or RADIUS_FIGHT_PLAYER
 
     if GetNpcAroundPlayerList then
-        -- Bot luyen cong (train) active tu XA hon (60 o thay vi 32) -> t·ªõi gan la da grind san, do delay
+        -- Bot luyen cong (train) active tu XA hon (60 o thay vi 32) -> t?i gan la da grind san, do delay
         -- "lai gan moi active". Bot khac giu 32 (tranh ton CPU toan map thanh thi nhieu bot).
         local actScanR = (tbNpc.mode == "train") and 60 or 32
         local allNpcs, nCount = GetNpcAroundPlayerList(tbNpc.finalIndex, actScanR)
@@ -897,11 +897,14 @@ SimMovement.Citizen = {
 
             -- [2026-06-20] Combat: DUOI npc dich gan nhat bang NpcRun -> 2 bot danh nhau di chuyen muot nhu player. KHONG duoi player (de bot danh NHAU soi noi, ko bu theo nguoi choi). Player van bi cast skill khi lai gan (sim.fight uu tien player). Throttle 1/4.
             tbNpc.chaseN = (tbNpc.chaseN or 0) + 1
-            if tbNpc.chaseN >= 10 then
+            local chaseEvery = 10
+            if tbNpc.mode == "train" then chaseEvery = 3 end
+            if tbNpc.chaseN >= chaseEvery then
                 tbNpc.chaseN = 0
                 local _e = tbNpc.fightSys:IsNpcEnemyAround(simInstance, tbNpc)
                 local _tx, _ty
                 if _e and _e > 0 then
+                    tbNpc.foundNpcEnemy = _e
                     local _ex, _ey = GetNpcPos(_e); _tx = floor(_ex/32); _ty = floor(_ey/32)
                 elseif tbNpc.isPlayerEnemyAround and tbNpc.isPlayerEnemyAround > 0 then  -- [2026-06-23] ko co NPC dich -> BAM THEO player
                     local _pw, _px, _py = CallPlayerFunction(tbNpc.isPlayerEnemyAround, GetWorldPos)
@@ -920,9 +923,18 @@ SimMovement.Citizen = {
 
             -- Case 2: tu dong thoat danh khi khong con ai
             if tbNpc.fightSys:CanLeaveFight(simInstance, tbNpc) == 1 then
-                return 1
+                return tbNpc.fightSys:LeaveFight(simInstance, tbNpc, 0, "khong tim thay quai")
             end
  
+            -- Train: keep casting while fighting
+            if tbNpc.mode == "train" and tbNpc.fightSys and tbNpc.fightSys.Update then
+                local _e2 = tbNpc.fightSys:IsNpcEnemyAround(simInstance, tbNpc)
+                if _e2 and _e2 > 0 then
+                    tbNpc.foundNpcEnemy = _e2
+                    tbNpc.fightSys:Update(simInstance, tbNpc)
+                end
+            end
+
             return 1 
         end
 
@@ -954,22 +966,24 @@ SimMovement.Citizen = {
                     end
                 end
 
-                -- Case 3: I auto switch to fight  mode
+                -- Case 3: start fight only when a real enemy is in range
                 if (tbNpc.CHANCE_ATTACK_NPC and random(1, tbNpc.CHANCE_ATTACK_NPC) <= 2) then
-                    -- CHo nhung dua chung quanh
-
                     local countFighting = tbNpc.fightSys:GetFightingNPCs(simInstance, tbNpc, myPosX, myPosY)
 
-                    -- Train bots always start alone; CHANCE>1 = "crazy" start alone for others
-                    if countFighting > 0 or tbNpc.CHANCE_ATTACK_NPC > 1 or tbNpc.mode == "train" then
+                    if tbNpc.mode == "train" then
+                        -- Train: only engage when monster/NPC enemy exists (no empty JoinFight wander)
+                        if tbNpc.fightSys:TriggerFightWithNPC(simInstance, tbNpc) == 1 then
+                            return 1
+                        end
+                    elseif countFighting > 0 or tbNpc.CHANCE_ATTACK_NPC > 1 then
                         countFighting = countFighting + 1
                         tbNpc.fightSys:JoinFight(simInstance, tbNpc, "I start a fight")
                     end
 
                     if countFighting > 0 and tbNpc.worldInfo.showFightingArea == 1 then
                         Msg2Map(nW,
-                            "C„ " .. countFighting .. " nh©n s‹ Æang Æ∏nh nhau tπi " .. tbNpc.worldInfo.name ..
-                            " <color=yellow>" .. floor(myPosX / 8) .. " " .. floor(myPosY / 16) .. "<color>")
+                            "C? " .. countFighting .. " nh?n s? ?ang ??nh nhau t?i " .. tbNpc.worldInfo.name ..
+                            " <color=yellow>" .. floor(myPosX / 8) .. " " .. floor(myPosY / 16) .. "</color>")
                     end
 
                     if (countFighting > 0) then

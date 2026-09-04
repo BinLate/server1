@@ -323,19 +323,26 @@ function SimCityLuyenCong:ATick()
 end
 
 function SimCityLuyenCong:mainMenu()
-    local text = "<color=yellow>=== HE THONG LUYEN CONG SIMBOT (DYNAMIC AOI) ===<color>\n"
-    text = text .. "Trang thai phan bo Simbot luyen cong tu dong theo vi tri nguoi choi:\n"
+    -- ASCII-only menu text (CreateTaskSay splits on '/'; never put '/' in label)
+    -- Do not use <color=...> here — many clients show raw tags in option rows
+    local text = "=== HE THONG LUYEN CONG SIMBOT (DYNAMIC AOI) ==="
+    text = text .. "<enter>Trang thai phan bo Simbot train theo vi tri nguoi choi:"
     local tbSay = { text }
 
     for i = 1, getn(self.TRAIN_MAPS) do
         local m = self.TRAIN_MAPS[i]
         local state = self.mapState[m.mapId]
-        local statusStr = (state and state.isSpawned == 1 and "<color=green>[Dang Hoat Dong - " .. (state.botCount or 0) .. " Bot]<color>") or "<color=gray>[Nghi / Hibernate 0% CPU]<color>"
+        local statusStr
+        if state and state.isSpawned == 1 then
+            statusStr = "[Dang train - " .. (state.botCount or 0) .. " bot]"
+        else
+            statusStr = "[Nghi - Hibernate]"
+        end
         tinsert(tbSay, m.name .. " " .. statusStr .. "/#SimCityLuyenCong:spawnForMap(" .. i .. ")")
     end
 
     tinsert(tbSay, "Kich hoat toan bo cac map luyen cong/#SimCityLuyenCong:spawnAllMaps()")
-    tinsert(tbSay, "Thu hoi / Don dep toan bo bot luyen cong/#SimCityLuyenCong:removeAll()")
+    tinsert(tbSay, "Thu hoi - Don dep toan bo bot luyen cong/#SimCityLuyenCong:removeAll()")
     tinsert(tbSay, "Ket thuc doi thoai/no")
     CreateTaskSay(tbSay)
 end

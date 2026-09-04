@@ -18,7 +18,7 @@ function createTaskSayThanhThi(extra)
 	if not extra then
 		extra = ""
 	end
-	tinsert(tbOpt, 1, "<dec><link=image[8,15]:#npcspr:?NPCSID="..tostring(nSettingIdx).."?ACTION="..tostring(nActionId)..">Triùu Mùn:<link> Thiùp vùn khùng phùi ngùùi tùt, nhùng thiùp ùùi vùi chùng... chùa tùng gian dùi." .. extra);
+	tinsert(tbOpt, 1, "<dec><link=image[8,15]:#npcspr:?NPCSID="..tostring(nSettingIdx).."?ACTION="..tostring(nActionId)..">Tri÷u M…n:<link> Thi’p vËn kh´ng ph∂i ng≠Íi tËt, nh≠ng thi’p ÆËi vÌi chµng... ch≠a tıng gian dËi." .. extra);
 	return tbOpt
 end
 
@@ -234,7 +234,7 @@ function SimCityThanhThi:caidat()
 
 	if getn(worldInfo.decoration) >= 1 then
 		if worldInfo.showDecoration == 0 then
-			tinsert(tbSay, "Mù hùi chù [khùng]/#SimCityThanhThi:showDecoration(1)")
+			tinsert(tbSay, "MÎ hÈi chÓ [kh´ng]/#SimCityThanhThi:showDecoration(1)")
 		else
 			tinsert(tbSay, "Mù hùi chù [cù]/#SimCityThanhThi:showDecoration(0)")
 		end
@@ -244,29 +244,29 @@ function SimCityThanhThi:caidat()
 	if worldInfo.allowChat == 1 then
 		tinsert(tbSay, "Trù chuyùn [cù]/#SimCityThanhThi:allowChat(0)")
 	else
-		tinsert(tbSay, "Trù chuyùn [khùng]/#SimCityThanhThi:allowChat(1)")
+		tinsert(tbSay, "Trﬂ chuy÷n [kh´ng]/#SimCityThanhThi:allowChat(1)")
 	end
 
 	if worldInfo.showFightingArea == 1 then
 		tinsert(tbSay, "Thùng bùo nùi ùùnh nhau [cù]/#SimCityThanhThi:showFightingArea(0)")
 	else
-		tinsert(tbSay, "Thùng bùo nùi ùùnh nhau [khùng]/#SimCityThanhThi:showFightingArea(1)")
+		tinsert(tbSay, "Th´ng b∏o n¨i Æ∏nh nhau [kh´ng]/#SimCityThanhThi:showFightingArea(1)")
 	end
 
 	if worldInfo.showingId == 1 then
 		tinsert(tbSay, "Hù sù bùo danh [cù]/#SimCityThanhThi:showhideNpcId(0)")
 	else
-		tinsert(tbSay, "Hù sù bùo danh [khùng]/#SimCityThanhThi:showhideNpcId(1)")
+		tinsert(tbSay, "H´ sË b∏o danh [kh´ng]/#SimCityThanhThi:showhideNpcId(1)")
 	end
 
 
 	if worldInfo.showName == 1 then
-		tinsert(tbSay, "Tùn [tù ùùng]/#SimCityThanhThi:showName(0)")
+		tinsert(tbSay, "T™n [t˘ ÆÈng]/#SimCityThanhThi:showName(0)")
 	else
-		tinsert(tbSay, "Tùn [tùt]/#SimCityThanhThi:showName(1)")
+		tinsert(tbSay, "T™n [tæt]/#SimCityThanhThi:showName(1)")
 	end
 
-	tinsert(tbSay, "Quay lùi/main")
+	tinsert(tbSay, "Quay lπi/main")
 	tinsert(tbSay, "Kùt thùc ùùi thoùi./no")
 	CreateTaskSay(tbSay)
 	return 1
@@ -316,7 +316,7 @@ function SimCityThanhThi:goiAnhHungThiep()
 	tinsert(tbSay, "Cao cùp 2 (100 thiùp)/#SimCityThanhThi:createNpcSet(3,100)")
 	tinsert(tbSay, "Cao cùp 3 (100 thiùp)/#SimCityThanhThi:createNpcSet(2,100)")
 	tinsert(tbSay, "Trung cùp (100 thiùp)/#SimCityThanhThi:createNpcSet(1,100)")
-	--tinsert(tbSay, "Tù chùn/#SimCityThanhThi:createNpcCustomAsk()")
+	--tinsert(tbSay, "T˘ ch‰n/#SimCityThanhThi:createNpcCustomAsk()")
 	tinsert(tbSay, "Kùt thùc ùùi thoùi./no")
 	CreateTaskSay(tbSay)
 	return 1
@@ -336,8 +336,8 @@ function SimCityThanhThi:thanhthiMenu()
 		tinsert(tbSay, "Phùt anh hùng thiùp/#SimCityThanhThi:goiAnhHungThiepNgoaiTrang()")
 		tinsert(tbSay, "Phùt quùi nhùn thiùp/#SimCityThanhThi:goiAnhHungThiep()")
 		tinsert(tbSay, "ùiùu ùùng quùn binh/#SimCityThanhThi:CreatePatrol()")
-		tinsert(tbSay, "Ban lùnh/#SimCityThanhThi:caidat()")
-		tinsert(tbSay, "Giùi tùn/#SimCityThanhThi:removeAll()")
+		tinsert(tbSay, "Ban l÷nh/#SimCityThanhThi:caidat()")
+		tinsert(tbSay, "Gi∂i t∏n/#SimCityThanhThi:removeAll()")
 		tinsert(tbSay, "Kùt thùc ùùi thoùi./no")
 		CreateTaskSay(tbSay)
 	end
@@ -360,19 +360,19 @@ function SimCityThanhThi:mainMenu()
 		CreateTaskSay(tbSay)
 	else
 		local counter = self:countMap(nW)
-		local tbSay = createTaskSayThanhThi("<enter><enter><color=yellow>Nhùn sù hiùn tùi: " .. counter .. "<color>")
+		local tbSay = createTaskSayThanhThi("<enter><enter><color=yellow>Nh©n sË hi÷n tπi: " .. counter .. "<color>")
 
 		if SimCityLuyenCong and SimCityLuyenCong.mainMenu then
 			tinsert(tbSay, "Luyen Cong - Phan bo Simbot train quai/#SimCityLuyenCong:mainMenu()")
 		end
 		tinsert(tbSay, "Thùnh Thù - Bù cùo thiùn hù/#SimCityThanhThi:thanhthiMenu()")
-		tinsert(tbSay, "Phùt ùùng Phong Hùa Liùn Thùnh/#SimCityThanhThi:moPhongHoaLienThanh()")
+		tinsert(tbSay, "Ph∏t ÆÈng Phong H·a Li™n Thµnh/#SimCityThanhThi:moPhongHoaLienThanh()")
 		tinsert(tbSay, "Phùt ùùng chiùn tranh/#SimCityChienTranh:mainMenu()")
 
 		if self.autoAddThanhThi == 1 then
-			tinsert(tbSay, "Tù ùùng thùm (mù)/#SimCityThanhThi:autoThanhThi(0)")
+			tinsert(tbSay, "T˘ ÆÈng th™m (mÎ)/#SimCityThanhThi:autoThanhThi(0)")
 		else
-			tinsert(tbSay, "Tù ùùng thùm (tùt)/#SimCityThanhThi:autoThanhThi(1)")
+			tinsert(tbSay, "T˘ ÆÈng th™m (tæt)/#SimCityThanhThi:autoThanhThi(1)")
 		end
 
 		tinsert(tbSay, "Kùt thùc ùùi thoùi./no")
@@ -387,8 +387,8 @@ function SimCityThanhThi:execPhongHoaLienThanh(level, phe)
 end
 function SimCityThanhThi:moPhongHoaLienThanh()
 	local tbSay = createTaskSayThanhThi("")
-	tinsert(tbSay, "Tùng Vù quùc Phong Hùa liùn thùnh/#SimCityThanhThi:execPhongHoaLienThanh(2,1)")
-	tinsert(tbSay, "Kim Vù quùc Phong Hùa liùn thùnh/#SimCityThanhThi:execPhongHoaLienThanh(2,2)")
+	tinsert(tbSay, "TËng V÷ quËc Phong H·a li™n thµnh/#SimCityThanhThi:execPhongHoaLienThanh(2,1)")
+	tinsert(tbSay, "Kim V÷ quËc Phong H·a li™n thµnh/#SimCityThanhThi:execPhongHoaLienThanh(2,2)")
 	tinsert(tbSay, "Kùt thùc ùùi thoùi./no")
 	CreateTaskSay(tbSay)
 
