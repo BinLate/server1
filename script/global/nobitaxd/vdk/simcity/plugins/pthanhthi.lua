@@ -512,6 +512,17 @@ function SimCityThanhThi:createNpcSoCapByMap(worldId)
 
 	local worldInfo = SimCityWorld:Get(nW)
 	if (worldInfo.name ~= "") then
+		-- Dedicated train maps: Dynamic AOI + roster owns spawn (no city/thon dual pop)
+		if LUYENCONG_AUTOADD == 1 and SimCityLuyenCong and SimCityLuyenCong.findMapIndex then
+			local trainIdx = SimCityLuyenCong:findMapIndex(nW)
+			if trainIdx then
+				worldInfo.allowFighting = 1
+				worldInfo.isTrainMap = 1
+				SimCityLuyenCong:spawnForMap(trainIdx)
+				return
+			end
+		end
+
 		local tmpFound = {}
 		local level
 		local total = 100
@@ -673,86 +684,6 @@ function SimCityThanhThi:createNpcSoCapByMap(worldId)
 				--self.patrolMap = nW
 				--self.patrolTimerId = AddTimer(20 * 18, "SimCityThanhThi:CreatePatrol", self)
 			end 
-		elseif LUYENCONG_AUTOADD == 1 then
-			tmpFound = nv9x
-			N = getn(tmpFound)
-			worldInfo.allowFighting = 1
-			worldInfo.isTrainMap = 1   
-			total = 10
-			local everything = {}
-			local _spNodes = {}  
-			for _k, _v in worldInfo.nodes do
-				if _v.x and _v.y and _v.nodeType == 1 then tinsert(_spNodes, {_v.x, _v.y}) end   
-			end
-			local _spN = getn(_spNodes)
-			local _picked = {}
-			local savedBots = (SimProgression and SimProgression.LoadTrainBots and SimProgression:LoadTrainBots(nW)) or {}
-			local hasSaved = (savedBots and getn(savedBots) > 0)
-			for i = 1, total do
-				local id = tmpFound[random(1, N)]
-				local grpCamp = i - (floor((i - 1) / 4) * 4)   
-				local _gx, _gy
-				if _spN > 0 then
-					local _best, _bestD = nil, -1
-					for _try = 1, 12 do
-						local _c = _spNodes[random(1, _spN)]
-						local _mind = 999999
-						for _pi = 1, getn(_picked) do
-							local _dd = GetDistanceRadius(_c[1], _c[2], _picked[_pi][1], _picked[_pi][2])
-							if _dd < _mind then _mind = _dd end
-						end
-						if _mind > _bestD then _bestD = _mind; _best = _c end
-					end
-					if _best then tinsert(_picked, _best); _gx = _best[1]*32; _gy = _best[2]*32 end
-				end
-				local botSavedData = hasSaved and savedBots[i]
-				local botLv = (botSavedData and botSavedData.level) or 1
-				local botExp = (botSavedData and botSavedData.nExp) or 0
-				local botName = (botSavedData and botSavedData.szName) or SimCityNPCInfo:generateName()
-				local botFaction = (botSavedData and botSavedData.faction) or nil
-				local children5 = {}
-				for j = 1, random(6, 7) do  
-					tinsert(children5, {
-						mode = "train",
-						camp = grpCamp,   
-						szName = SimCityNPCInfo:generateName(),
-						nNpcId = tmpFound[random(1, N)],
-						level = botLv,
-						nExp = 0
-					})
-				end
-				tinsert(everything, {{id, nW,
-					{
-						szName = botName,
-						ngoaitrang = 1,
-						mode = "train",
-						level = botLv,
-						nExp = botExp,
-						faction = botFaction,
-						capHP = 1,
-						camp = grpCamp,   
-						goX32 = _gx, goY32 = _gy,   
-						childrenSetup = children5,
-						walkMode =
-						"random",
-						CHANCE_ATTACK_PLAYER = 1, -- co hoi tan cong nguoi choi neu di ngang qua
-						CHANCE_ATTACK_NPC = 1, -- co hoi bat chien dau khi thay NPC khac phe
-						CHANCE_JOIN_FIGHT = 1, -- co hoi tang cong NPC neu di ngang qua NPC danh nhau
-						RADIUS_FIGHT_PLAYER = 15, -- scan for player around and randomly attack
-						RADIUS_FIGHT_NPC = 15, -- scan for NPC around and start randomly attack,
-						RADIUS_FIGHT_SCAN = 15, -- scan for fight around and join/leave fight it
-						noStop = 1, -- optional: cannot pause any stop (otherwise 90% walk 10% stop)
-						leaveFightWhenNoEnemy = 1, -- optional: leave fight instantly after no enemy, otherwise there's waiting period
-						walkVar = 2, 
-						kind = 0, -- quai mode
-						TIME_FIGHTING_minTs = 1800,
-						TIME_FIGHTING_maxTs = 3000,
-						TIME_RESTING_minTs = 1,
-						TIME_RESTING_maxTs = 3,
-					}}});
-			end
-			
-			self:_createBatch(everything)
 		end	
 		if nW == 53 or nW == 20 or nW == 99 or nW == 100 or nW == 101 or nW == 121 or nW == 153 or nW == 174 then
 			worldInfo.allowFighting = 0

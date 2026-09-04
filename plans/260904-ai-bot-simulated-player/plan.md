@@ -55,8 +55,8 @@ Phase 3–4 làm ngay sau MVP vì gắn trực tiếp với “lớn lên như n
 | Phase | Name | Status | Progress |
 |-------|------|--------|----------|
 | 00 | Restore spawn (blocker) | ✅ Done | 100% |
-| 01 | Thành thị như bản gốc | 🟡 In Progress | 70% |
-| 02 | Bot lớn dần + tự train (+ AOI/persistence kiến trúc) | ⬜ Pending | 0% |
+| 01 | Thành thị như bản gốc | ✅ Done (code) | 95% |
+| 02 | Bot lớn dần + tự train (+ AOI/persistence kiến trúc) | 🟡 In Progress | 35% |
 | 03 | Trang bị + ngựa theo cấp | ⬜ Pending | 0% |
 | 04 | Hành vi môn phái | ⬜ Pending | 0% |
 | 05 | Tống Kim thông minh (5/5/10) | ⬜ Pending | 0% |

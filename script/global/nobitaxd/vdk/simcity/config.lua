@@ -34,6 +34,7 @@ TONGKIM_SPAWN_MINSTAY = 0         -- thoi gian toi thieu o lai dai doanh truoc k
 TONGKIM_SPAWN_MAXSTAY = 1        -- thoi gian toi da co the nup trong dai doanh
 
 -- DYNAMIC AOI & TRAINING MAP BUDGET setup
+SIMBOT_TRAIN_START_LEVEL = 10     -- cap khoi tao bot train moi (chua co roster)
 TRAIN_BOT_MAX_PER_MAP = 25        -- so luong bot toi da tren 1 map luyen cong
 TRAIN_BOT_GLOBAL_BUDGET = 200     -- tong ngan sach Simbot luyen cong toan server
 AOI_SCAN_INTERVAL = 15            -- chu ky quet nguoi choi (giay)

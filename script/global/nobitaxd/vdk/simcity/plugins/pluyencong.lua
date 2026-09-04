@@ -14,15 +14,16 @@ SimCityLuyenCong = {
 }
 
 SimCityLuyenCong.TRAIN_MAPS = {
+    -- mapId must match settings/global/vdk/simcity/maps/thanhthi.txt (NOT city IDs)
     [1] = { name = "Ba Lang Huyen (1-20)", mapId = 53, minLv = 1, maxLv = 20, count = 15 },
-    [2] = { name = "Phuc Nguu Son (20-40)", mapId = 11, minLv = 20, maxLv = 40, count = 18 },
-    [3] = { name = "Kinh Hoang Dong (40-60)", mapId = 17, minLv = 40, maxLv = 60, count = 20 },
-    [4] = { name = "Lam Du Quan (60-80)", mapId = 70, minLv = 60, maxLv = 80, count = 20 },
-    [5] = { name = "Dao Hoa Dao (80-90)", mapId = 181, minLv = 80, maxLv = 90, count = 22 },
+    [2] = { name = "Phuc Nguu Son Tay (20-40)", mapId = 41, minLv = 20, maxLv = 40, count = 18 },
+    [3] = { name = "Kinh Hoang Dong (40-60)", mapId = 5, minLv = 40, maxLv = 60, count = 20 },
+    [4] = { name = "Lam Du Quan (60-80)", mapId = 319, minLv = 60, maxLv = 80, count = 20 },
+    [5] = { name = "Dao Hoa Nguyen (80-90)", mapId = 55, minLv = 80, maxLv = 90, count = 22 },
     [6] = { name = "Truong Bach Son Nam (90-120)", mapId = 321, minLv = 90, maxLv = 120, count = 25 },
-    [7] = { name = "Mac Bac Thao Nguyen (120-150)", mapId = 325, minLv = 120, maxLv = 150, count = 25 },
-    [8] = { name = "Sa Mac Dia Dao (150-180)", mapId = 225, minLv = 150, maxLv = 180, count = 25 },
-    [9] = { name = "Vi Son Dao (180-200)", mapId = 340, minLv = 180, maxLv = 200, count = 25 }
+    [7] = { name = "Mac Bac Thao Nguyen (120-150)", mapId = 341, minLv = 120, maxLv = 150, count = 25 },
+    [8] = { name = "Sa Mac Tang 1 (150-180)", mapId = 225, minLv = 150, maxLv = 180, count = 25 },
+    [9] = { name = "Vi Son Dao (180-200)", mapId = 342, minLv = 180, maxLv = 200, count = 25 }
 }
 
 -- PK / Chat shouts for Do Sat (Camp 5) bots
@@ -145,7 +146,20 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
         savedIdx = savedIdx + 1
 
         local id = (savedBot and savedBot.nNpcId) or pool[random(1, getn(pool))]
-        local lv = (savedBot and savedBot.level) or random(m.minLv, m.maxLv)
+        local startLv = SIMBOT_TRAIN_START_LEVEL or 10
+        local lv
+        if savedBot and savedBot.level then
+            lv = savedBot.level
+        else
+            -- New bot: startLv on early maps; otherwise map minLv (migrated tier fill)
+            if m.minLv <= startLv then
+                lv = startLv
+            else
+                lv = m.minLv
+            end
+            if lv < m.minLv then lv = m.minLv end
+            if lv > m.maxLv then lv = m.maxLv end
+        end
         local nExp = (savedBot and savedBot.nExp) or 0
         local szName = (savedBot and savedBot.szName) or nil
         local faction = (savedBot and savedBot.faction) or nil
