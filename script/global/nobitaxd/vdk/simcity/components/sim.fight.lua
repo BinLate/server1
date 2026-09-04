@@ -510,29 +510,49 @@ SimFight.Citizen = {
     IsNpcEnemyAround = function(self, simInstance, tbNpc)
         local allNpcs = {}
         local nCount = 0
+        local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+        local grind = (tbNpc.mode == "train" or outdoorOk)
         local radius = tbNpc.RADIUS_FIGHT_SCAN or RADIUS_FIGHT_SCAN
-        if tbNpc.mode == "train" or (tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1) then
+        if grind then
             radius = tbNpc.RADIUS_FIGHT_SCAN or 20
         end
 
         allNpcs, nCount = GetNpcAroundNpcList(tbNpc.finalIndex, radius)
-        if not allNpcs or not nCount then return 0 end
+        if not allNpcs or not nCount or nCount <= 0 then return 0 end
+
+        local bestMonster = 0
+        local bestKind0 = 0
         for i = 1, nCount do
-            if allNpcs[i] ~= tbNpc.finalIndex then
-                local fighter2Kind = GetNpcKind(allNpcs[i])
-                local fighter2Camp = GetNpcCurCamp(allNpcs[i])
-                if GetNpcParam and GetNpcParam(allNpcs[i], 4) == 1 then
-                    -- skip other simbots
-                elseif tbNpc.mode == "train" or (tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1) then
-                    -- Grind maps: any non-simbot NPC/monster
-                    if fighter2Kind ~= nil then
-                        return allNpcs[i]
+            local idx = allNpcs[i]
+            if idx and idx ~= tbNpc.finalIndex then
+                local isSim = GetNpcParam and (GetNpcParam(idx, 4) == 1)
+                if not isSim then
+                    local fighter2Kind = GetNpcKind(idx)
+                    local fighter2Camp = GetNpcCurCamp(idx)
+                    local alive = 1
+                    if NPCINFO_GetNpcCurrentLife then
+                        local life = NPCINFO_GetNpcCurrentLife(idx)
+                        if life ~= nil and life <= 0 then alive = 0 end
                     end
-                elseif fighter2Kind == 0 and IsAttackableCamp(tbNpc.camp, fighter2Camp) == 1 then
-                    return allNpcs[i]
+                    if alive == 1 then
+                        if grind then
+                            -- Prefer real monsters (kind ~= 0); also allow kind==0 non-simbot NPCs
+                            if fighter2Kind ~= nil and fighter2Kind ~= 0 then
+                                if bestMonster == 0 then bestMonster = idx end
+                            elseif fighter2Kind == 0 then
+                                if bestKind0 == 0 then bestKind0 = idx end
+                            elseif fighter2Kind ~= nil and bestKind0 == 0 then
+                                bestKind0 = idx
+                            end
+                        elseif fighter2Kind == 0 and IsAttackableCamp(tbNpc.camp, fighter2Camp) == 1 then
+                            return idx
+                        end
+                    end
                 end
             end
         end
+        if bestMonster > 0 then return bestMonster end
+        if bestKind0 > 0 then return bestKind0 end
         return 0
     end,
     CanLeaveFight = function(self, simInstance, tbNpc)
@@ -646,6 +666,10 @@ SimFight.Citizen = {
         local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
         if tbNpc.mode == "train" or outdoorOk then
             self:SetFightState(tbNpc, 9, currX, currY)
+            if (not tbNpc.foundNpcEnemy) or tbNpc.foundNpcEnemy <= 0 then
+                local e = self:IsNpcEnemyAround(simInstance, tbNpc)
+                if e and e > 0 then tbNpc.foundNpcEnemy = e end
+            end
             if tbNpc.foundNpcEnemy and tbNpc.foundNpcEnemy > 0 then
                 local _ex, _ey = GetNpcPos(tbNpc.foundNpcEnemy)
                 if _ex and NpcRun then

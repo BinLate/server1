@@ -921,13 +921,19 @@ SimMovement.Citizen = {
                 return tbNpc.fightSys:LeaveFight(simInstance, tbNpc, 0, "toi gio thay doi trang thai")
             end
 
-            -- Case 2: tu dong thoat danh khi khong con ai
+            -- Case 2: train/outdoor keep AI fight (goc); thanhthi may LeaveFight
             if tbNpc.fightSys:CanLeaveFight(simInstance, tbNpc) == 1 then
-                return tbNpc.fightSys:LeaveFight(simInstance, tbNpc, 0, "khong tim thay quai")
+                local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+                if tbNpc.mode == "train" or outdoorOk then
+                    -- goc: return without LeaveFight so engine AI keeps hunting
+                else
+                    return tbNpc.fightSys:LeaveFight(simInstance, tbNpc, 0, "khong tim thay quai")
+                end
             end
  
-            -- Train: keep casting while fighting
-            if tbNpc.mode == "train" and tbNpc.fightSys and tbNpc.fightSys.Update then
+            -- Train/outdoor: keep casting while fighting
+            local outdoorCast = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+            if (tbNpc.mode == "train" or outdoorCast) and tbNpc.fightSys and tbNpc.fightSys.Update then
                 local _e2 = tbNpc.fightSys:IsNpcEnemyAround(simInstance, tbNpc)
                 if _e2 and _e2 > 0 then
                     tbNpc.foundNpcEnemy = _e2
@@ -966,19 +972,18 @@ SimMovement.Citizen = {
                     end
                 end
 
-                -- Case 3: start fight only when a real enemy is in range
+                -- Case 3: train/outdoor try scan first, else JoinFight like goc when CHANCE_ATTACK_NPC > 1
                 if (tbNpc.CHANCE_ATTACK_NPC and random(1, tbNpc.CHANCE_ATTACK_NPC) <= 2) then
                     local countFighting = tbNpc.fightSys:GetFightingNPCs(simInstance, tbNpc, myPosX, myPosY)
+                    local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
 
-                    if tbNpc.mode == "train" then
-                        -- Train: only engage when monster/NPC enemy exists (no empty JoinFight wander)
+                    if tbNpc.mode == "train" or outdoorOk then
                         if tbNpc.fightSys:TriggerFightWithNPC(simInstance, tbNpc) == 1 then
                             return 1
                         end
-                    elseif tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1 then
-                        -- Outdoor grind (e.g. Vu Lang Dong): hunt monsters
-                        if tbNpc.fightSys:TriggerFightWithNPC(simInstance, tbNpc) == 1 then
-                            return 1
+                        if countFighting > 0 or tbNpc.CHANCE_ATTACK_NPC > 1 then
+                            countFighting = countFighting + 1
+                            tbNpc.fightSys:JoinFight(simInstance, tbNpc, "I start a fight")
                         end
                     elseif countFighting > 0 or tbNpc.CHANCE_ATTACK_NPC > 1 then
                         countFighting = countFighting + 1

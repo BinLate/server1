@@ -50,5 +50,7 @@ AOI/hibernate/budget là **yêu cầu kiến trúc từ phase này**, không ch�
 ## Notes
 Tận dụng code hiện có — **không** tạo subsystem train song song.
 
+**Blocker (2026-09-04):** bot trên Lâm Du Quan đứng cạnh quái không đánh — xem plan fix riêng [phase-02b-train-combat-fix.md](phase-02b-train-combat-fix.md) trước khi tiếp identity/save.
+
 ---
-Next Phase: [phase-03-gear-horse.md](phase-03-gear-horse.md)
+Next: [phase-02b-train-combat-fix.md](phase-02b-train-combat-fix.md) → rồi [phase-03-gear-horse.md](phase-03-gear-horse.md)
