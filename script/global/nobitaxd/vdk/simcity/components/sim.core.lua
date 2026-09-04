@@ -345,6 +345,10 @@ function SimEnsureCombatAttackable(tbNpc)
     if not tbNpc or not tbNpc.finalIndex or tbNpc.finalIndex <= 0 then return end
     if tbNpc.mode ~= "train" and tbNpc.tongkim ~= 1 and tbNpc.isAttackable ~= 1 then return end
     if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
+    -- Migrate legacy peaceful camp=0 -> camp 1-3 so players can Do Sat them
+    if tbNpc.mode == "train" and (tbNpc.camp == nil or tbNpc.camp == 0) then
+        tbNpc.camp = random(1, 3)
+    end
     if SetNpcCurCamp and tbNpc.camp ~= nil then SetNpcCurCamp(tbNpc.finalIndex, tbNpc.camp) end
 end
 
@@ -897,8 +901,11 @@ function SimCore:OnTimer(tbNpc, rate)
             end
         end
         if (EnforceBotHp) then            
-            EnforceBotHp(tbNpc.finalIndex, 1)          
-            if tbNpc.tongkim ~= 1
+            EnforceBotHp(tbNpc.finalIndex, 1)
+            -- Do not potion-heal while player is PKing this bot (otherwise Do Sat feels impossible)
+            local _underPlayerPk = (tbNpc.duelPlayerId or tbNpc.selfDefDuel == 1
+                or (tbNpc.selfDefTick and tbNpc.selfDefTick > tbNpc.tick_breath)) and 1 or 0
+            if tbNpc.tongkim ~= 1 and _underPlayerPk ~= 1
                and NPCINFO_GetNpcCurrentLife and NPCINFO_GetNpcCurrentMaxLife
                and (not tbNpc.potionTick or tbNpc.potionTick <= tbNpc.tick_breath) then
                 tbNpc.potionTick = tbNpc.tick_breath + 1.5*18/REFRESH_RATE  
@@ -927,12 +934,8 @@ function SimCore:OnTimer(tbNpc, rate)
             SetBotSpeed(tbNpc.finalIndex, 15, 24)  
         end
        
-        if (BotMountSync) then
-            BotMountSync(tbNpc.finalIndex, tbNpc.isFighting or 0)
-        end
-    
         if SetNpcRideHorse and tbNpc.tongkim ~= 1 then
-            -- Horse policy: travel mounted; combat horse state owned by SimApplyHorseCombat(pendingSkill)
+            -- Horse policy: travel mounted; combat horse owned by pendingSkill allowlist
             local _inCbt = (tbNpc.isFighting or 0) == 1 or tbNpc.duelPlayerId or tbNpc.botDuelTarget
             local _wantRide = 1
             if (tbNpc.level or 1) < 20 then
@@ -940,8 +943,15 @@ function SimCore:OnTimer(tbNpc, rate)
             elseif _inCbt and tbNpc.pendingSkillId and SimSkillMeta and SimSkillMeta:CanCastOnHorse(tbNpc.pendingSkillId) ~= 1 then
                 _wantRide = 0
             elseif _inCbt and tbNpc.isCurrentlyRiding == 0 then
-                -- already dismounted for cast; keep foot until LeaveFight remount
                 _wantRide = 0
+            elseif _inCbt and tbNpc.skillCastBua and tbNpc.skillCastBua[1]
+                   and SimSkillMeta and SimSkillMeta:CanCastOnHorse(tbNpc.skillCastBua[1]) ~= 1
+                   and (not tbNpc.pendingSkillId or SimSkillMeta:CanCastOnHorse(tbNpc.pendingSkillId) ~= 1) then
+                -- Primary train skill is FOOT (e.g. Conlon 372/375): stay dismounted whole fight
+                _wantRide = 0
+            end
+            if BotMountSync then
+                BotMountSync(tbNpc.finalIndex, _wantRide)
             end
             if tbNpc.lastRideWant ~= _wantRide or (not _inCbt and (not tbNpc.remountTick or tbNpc.remountTick <= tbNpc.tick_breath)) then
                 if not _inCbt then
@@ -954,6 +964,8 @@ function SimCore:OnTimer(tbNpc, rate)
                     if SetBotSpeed then SetBotSpeed(tbNpc.finalIndex, 15, 24) end
                 end
             end
+        elseif BotMountSync then
+            BotMountSync(tbNpc.finalIndex, tbNpc.isCurrentlyRiding or 0)
         end
         if SimEnsureCombatAttackable then SimEnsureCombatAttackable(tbNpc) end
     end

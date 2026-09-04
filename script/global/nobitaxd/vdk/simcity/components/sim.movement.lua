@@ -220,7 +220,10 @@ SimMovement.KeoXe = {
                 tbNpc.isPlayerFighting = isPlayerFighting
 
                 if tbNpc.mode ~= "tieuthiep" then
-                    if isPlayerFighting == 1 then
+                    -- Train/TK/attackable bots MUST stay kind=0 so players can PK them
+                    if tbNpc.mode == "train" or tbNpc.tongkim == 1 or tbNpc.isAttackable == 1 then
+                        SetNpcKind(tbNpc.finalIndex, 0)
+                    elseif isPlayerFighting == 1 then
                         SetNpcKind(tbNpc.finalIndex, tbNpc.kind or 4)
                     else
                         SetNpcKind(tbNpc.finalIndex, 0)

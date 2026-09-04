@@ -689,12 +689,19 @@ SimFight.Citizen = {
         reason = reason or "no reason"
 
 
-        -- If already having last fight pos, we may simply chance AI to 1
+        -- If already having last fight pos, we may simply change AI
         local currX, currY, currW = GetNpcPos(tbNpc.finalIndex)
         if tbNpc.lastFightPos then
             if tbNpc.lastFightPos.W == currW then
                 if (GetDistanceRadius(tbNpc.lastFightPos.X/32, tbNpc.lastFightPos.Y/32, currX/32, currY/32) < 16) then
-                    self:SetFightState(tbNpc, 9, currX, currY)
+                    local outdoorOkFast = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+                    if tbNpc.mode == "train" or outdoorOkFast then
+                        self:SetFightState(tbNpc, 0, currX, currY)
+                        if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
+                        if self.Update then self:Update(simInstance, tbNpc) end
+                    else
+                        self:SetFightState(tbNpc, 9, currX, currY)
+                    end
                     return 1
                 end
             end
@@ -702,7 +709,9 @@ SimFight.Citizen = {
         
         local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
         if tbNpc.mode == "train" or outdoorOk then
-            self:SetFightState(tbNpc, 9, currX, currY)
+            -- AI mode 0: Lua owns cast + horse. Mode 1 engine AI casts while mounted and breaks FOOT skills.
+            self:SetFightState(tbNpc, 0, currX, currY)
+            if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
             if (not tbNpc.foundNpcEnemy) or tbNpc.foundNpcEnemy <= 0 then
                 local e = self:IsNpcEnemyAround(simInstance, tbNpc)
                 if e and e > 0 then tbNpc.foundNpcEnemy = e end

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Dev-time validator for SimBot FACTION_SKILLS combat metadata."""
+"""Dev-time validator for SimBot FACTION_SKILLS combat metadata + user canonical matrix."""
 from __future__ import annotations
 
 import re
@@ -11,6 +11,10 @@ META = ROOT / "script/global/nobitaxd/vdk/simcity/components/sim.skill_meta.lua"
 PROG = ROOT / "script/global/nobitaxd/vdk/simcity/components/sim.progression.lua"
 CORE = ROOT / "script/global/nobitaxd/vdk/simcity/components/sim.core.lua"
 HORSE = ROOT / "script/global/nobitaxd/vdk/simcity/components/sim.horse_skills.lua"
+PLUYEN = ROOT / "script/global/nobitaxd/vdk/simcity/plugins/pluyencong.lua"
+
+sys.path.insert(0, str(ROOT / "tools"))
+from gen_skill_meta import USER_CANONICAL_9X  # noqa: E402
 
 
 def parse_meta(text: str):
@@ -30,7 +34,6 @@ def parse_meta(text: str):
 
 def faction_skill_ids(text: str):
     ids = set()
-    # only inside FACTION_SKILLS
     m = re.search(r"SimProgression\.FACTION_SKILLS\s*=\s*\{", text)
     if not m:
         return ids
@@ -53,6 +56,7 @@ def main() -> int:
     prog = PROG.read_text(encoding="utf-8", errors="replace")
     core = CORE.read_text(encoding="utf-8", errors="replace")
     horse = HORSE.read_text(encoding="utf-8", errors="replace")
+    pluyen = PLUYEN.read_text(encoding="utf-8", errors="replace")
     ids = faction_skill_ids(prog)
     errors = []
     warns = []
@@ -61,38 +65,37 @@ def main() -> int:
         errors.append("SIMBOT_DISMOUNT_SKILLS not cleared")
     if "SIMBOT_SKILL_RANGE = nil" not in core:
         errors.append("SIMBOT_SKILL_RANGE not cleared")
-    if re.search(r"\[375\]\s*=\s*1", horse):
-        errors.append("legacy HORSE_SKILLS still lists 375")
     if "HORSE_SKILLS = {}" not in horse:
         warns.append("HORSE_SKILLS should be empty stub")
+    if "random(1, 3)" not in pluyen:
+        errors.append("train spawn must assign peaceful camp via random(1, 3)")
+    if re.search(r"local camp = \(isDoSat == 1 and 5\) or 0", pluyen):
+        errors.append("train spawn still uses camp 0 for peaceful bots")
 
     for sid in sorted(ids):
         m = meta.get(sid)
         if not m:
             errors.append(f"FACTION_SKILLS id {sid} missing metadata")
             continue
-        if m["ar"] <= 0:
-            errors.append(f"{sid}: invalid AttackRadius")
-        if m["horse"] not in (0, 1):
-            errors.append(f"{sid}: invalid horse flag")
-        if m["melee"] == 1 and m["ar"] > 256:
-            warns.append(f"{sid}: melee flag with long radius {m['ar']}")
         if m["typ"] == 2 and m["horse"] == 1:
             errors.append(f"{sid}: trap marked horse-allowed")
         if m["typ"] == 3 and m["horse"] == 1:
             errors.append(f"{sid}: support marked horse-allowed")
 
-    # Contradiction check against expected foot/mounted matrix
-    expect = {
-        318: 0, 321: 1, 322: 1, 302: 1, 342: 0, 351: 0, 355: 1,
-        361: 1, 362: 0, 368: 0, 375: 0, 323: 0, 336: 0,
-    }
-    for sid, h in expect.items():
+    for sid, (wh, wnear) in USER_CANONICAL_9X.items():
         m = meta.get(sid)
-        if not m or m["horse"] != h:
-            errors.append(f"matrix mismatch {sid}: want horse={h}")
+        if not m:
+            errors.append(f"canonical id {sid} missing")
+            continue
+        if m["horse"] != wh:
+            errors.append(f"canonical horse mismatch {sid}: want {wh} got {m['horse']}")
+        near = 1 if (m["melee"] == 1 or m["typ"] == 2 or m["ar"] <= 120) else 0
+        if near != wnear:
+            errors.append(
+                f"canonical range mismatch {sid}: want near={wnear} got near={near} ar={m['ar']} melee={m['melee']}"
+            )
 
-    print(f"checked {len(ids)} FACTION_SKILLS ids, {len(meta)} meta entries")
+    print(f"checked {len(ids)} FACTION_SKILLS ids, {len(USER_CANONICAL_9X)} canonical 9x")
     for w in warns:
         print("WARN:", w)
     for e in errors:

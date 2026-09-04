@@ -171,7 +171,9 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
         local weaponBranch = (savedBot and savedBot.weaponBranch) or nil
         local personality = (savedBot and savedBot.personality) or "balanced"
 
-        -- Do Sat (camp 5): only when TRAIN_DOSAT_PCT > 0; default 0 = peaceful grind
+        -- Peaceful grinders: camp 1-3 (NOT camp 0).
+        -- Camp 0 is unattackable by players in many JX1 builds even with murder PK.
+        -- Do Sat bots stay camp 5. Peaceful bots never initiate player PK.
         local dosatPct = TRAIN_DOSAT_PCT or 0
         local isDoSat = 0
         if dosatPct > 0 then
@@ -181,7 +183,14 @@ function SimCityLuyenCong:spawnForMap(mapIdx)
                 isDoSat = 1
             end
         end
-        local camp = (isDoSat == 1 and 5) or 0
+        local camp = 5
+        if isDoSat ~= 1 then
+            if savedBot and savedBot.camp and savedBot.camp >= 1 and savedBot.camp <= 3 then
+                camp = savedBot.camp
+            else
+                camp = random(1, 3)
+            end
+        end
 
         local tbNpc = {
             nNpcId = id,

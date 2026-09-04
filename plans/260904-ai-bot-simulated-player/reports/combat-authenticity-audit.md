@@ -1,82 +1,47 @@
-# SimBot Horse / Range Combat Authenticity Audit (final)
+# SimBot Horse / Range / PK — Canonical Standard (locked 2026-09-04)
 
-## Policy
+## Horse + range matrix (9x primary skills)
 
-**Only positively verified skill IDs may cast while mounted. Everything else dismounts.**
+| Branch | Skill ID | Horse | Range |
+|--------|--------:|-------|-------|
+| Thieu Lam Quyen | 318 | FOOT | melee |
+| Thieu Lam Bong | 319 | FOOT | melee |
+| Thieu Lam Dao | 321 | **MOUNT** | ranged |
+| Thien Vuong Thuong | 323 | FOOT | melee |
+| Thien Vuong Dao | 322 | **MOUNT** | melee |
+| Thien Vuong Chuy | 325 | FOOT | melee |
+| Duong Mon Tu Tien | 302 | **MOUNT** | long |
+| Duong Mon Phi Tieu | 342 | FOOT | ranged |
+| Duong Mon Phi Dao | 339 | FOOT | ranged |
+| Duong Mon Bay | 351 | FOOT | trap |
+| Ngu Doc Dao | 355 | **MOUNT** | mid/ranged |
+| Ngu Doc Chuong | 353 | FOOT | ranged |
+| Nga Mi Kiem | 328 | FOOT | ranged |
+| Nga Mi Chuong | 380 | FOOT | ranged |
+| Thuy Yen Don Dao | 336 | FOOT | ranged |
+| Thuy Yen Song Dao | 337 | FOOT | ranged |
+| Cai Bang Chuong | 357 | FOOT | ranged |
+| Cai Bang Bong | 359 | FOOT | ranged |
+| Thien Nhan Mau | 361 | **MOUNT** | melee |
+| Thien Nhan Dao | 362 | FOOT | ranged |
+| Vo Dang Kiem | 368 | FOOT | melee |
+| Vo Dang Khi | 365 | FOOT | long |
+| Con Lon Dao | 372 | FOOT | ranged |
+| Con Lon Kiem | 375 | FOOT | long |
 
-**Every cast uses the exact AttackRadius of the exact pending skill.**
+Source of truth: `tools/gen_skill_meta.py` → `USER_CANONICAL_9X` + `VERIFIED_HORSE_ALLOWLIST`.
 
-Horse and range are independent (`MOUNTED+MELEE`, `MOUNTED+RANGED`, `FOOT+MELEE`, `FOOT+RANGED`).
+## PK / Do Sat training bots
 
-## Single source of truth
+- Peaceful train bots use **camp 1–3** (never camp 0 — camp 0 is unattackable by players on this engine).
+- Do Sat bots use **camp 5**.
+- Train bots stay `NpcKind=0` always (player-attackable).
+- No potion heal while under player PK (`duelPlayerId` / `selfDefTick`).
+- Train combat uses **Lua cast** (`SetNpcAI 0`), not engine AI mode 1 (which cast while mounted).
 
-| Concern | Authority |
-|---------|-----------|
-| Runtime meta | `sim.skill_meta.lua` via `SimSkillMeta:GetSkillCombatMeta(id)` |
-| Generator | `tools/gen_skill_meta.py` |
-| Radius | `settings/skills.txt` AttackRadius (wins over legacy Lua tables) |
-| Horse | STRICT allowlist in generator (`VERIFIED_HORSE_ALLOWLIST`) + requires `HorseLimit==0` |
-| Validator | `tools/validate_simbot_skill_meta.py` |
-| Full FACTION_SKILLS table | `plans/.../reports/faction-skills-combat-meta.md` |
+## Runtime API
 
-### Removed contradictions
-
-- `SimProgression.HORSE_SKILLS` emptied (stub only)
-- `SIMBOT_DISMOUNT_SKILLS = nil`
-- `SIMBOT_SKILL_RANGE = nil`
-
-## HorseLimit vs allowlist
-
-`HorseLimit` alone is insufficient (many HL=0 support/buff skills must stay FOOT).
-
-Final horse decision:
-
-```text
-horseAllowed = 1
-  IFF skillId in VERIFIED_HORSE_ALLOWLIST
-  AND HorseLimit == 0
-  AND skill is not trap/support
-ELSE horseAllowed = 0
+```lua
+SimSkillMeta:GetSkillCombatMeta(skillId)
+-- horseAllowed, attackRadiusPx, attackRadiusTiles, rangeClass, skillType
 ```
-
-Verified allowlist (HL=0 confirmed): `13, 32, 64, 74, 302, 321, 322, 355, 361, 1057, 1067`
-
-Excluded despite classic "maybe mounted" when `HorseLimit!=0`: `1059`, `1069`, `1076`.
-
-## Tile conversion
-
-`GetDistanceRadius` uses **tile** units.
-
-```text
-tiles = ceil(AttackRadiusPx / 32)   -- (px + 31) // 32
-90px -> 3 tiles (not floored to 2)
-60px -> 2 tiles
-470px -> 15 tiles
-```
-
-## Pending-skill pipeline
-
-```text
-SimPickSkill once -> pendingSkillId
-  -> GetSkillCombatMeta
-  -> range / horse / type from SAME id
-  -> move / dismount / cast SAME id
-```
-
-No second `SimPickSkill` between range check and cast on BV path.
-
-## High-priority matrix
-
-| ID | Mounted | AR px | tiles | Notes |
-|----|---------|------:|------:|-------|
-| 318 | NO | 90 | 3 | melee foot |
-| 321 | YES | 400 | 13 | mounted ranged |
-| 322 | YES | 90 | 3 | mounted melee (must chase) |
-| 302 | YES | 470 | 15 | mounted long |
-| 342 | NO | 360 | 12 | foot ranged |
-| 351 | NO | 50 | 2 | trap |
-| 355 | YES | 180 | 6 | mounted mid |
-| 361 | YES | 60 | 2 | mounted melee (must get close) |
-| 362 | NO | 420 | 14 | foot long |
-| 368 | NO | 90 | 3 | foot melee |
-| 375 | NO | 470 | 15 | Conlon lightning FOOT |

@@ -44,11 +44,18 @@ class TestSkillCombatMetaMatrix(unittest.TestCase):
         expect = {
             318: 0, 319: 0, 321: 1, 322: 1, 302: 1, 342: 0, 351: 0,
             355: 1, 336: 0, 337: 0, 361: 1, 362: 0, 368: 0, 375: 0,
-            323: 0, 325: 0, 1059: 0, 1069: 0, 1076: 0,
+            323: 0, 325: 0, 380: 0, 372: 0, 339: 0, 353: 0,
+            1059: 0, 1069: 0, 1076: 0,
         }
         for sid, horse in expect.items():
             e = meta_entry(self.src, sid)
             self.assertEqual(e["horse"], horse, f"skill {sid} horse")
+
+    def test_380_phong_suong_is_ranged_not_melee(self):
+        e = meta_entry(self.src, 380)
+        self.assertEqual(e["horse"], 0)
+        self.assertEqual(e["melee"], 0)
+        self.assertGreater(e["ar"], 120)
 
     def test_high_priority_radius(self):
         expect_ar = {

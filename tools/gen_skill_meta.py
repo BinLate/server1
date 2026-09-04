@@ -47,27 +47,57 @@ OUT_REPORT = (
     / "faction-skills-combat-meta.md"
 )
 
-# Positively verified mounted combat skill IDs (ALLOWLIST).
-# Evidence: user matrix §14 + skills.txt HorseLimit==0 confirmation.
-# 150 upgrades with HL>=1 are intentionally EXCLUDED (default deny).
+# Positively verified mounted combat skill IDs (ALLOWLIST / DEFAULT-DENY).
+# Canonical user matrix (2026-09-04) locked as production standard:
+#   MOUNTED: TL Dao 321, TV Dao 322, DM TuTien 302, ND Dao 355, TN Mau 361
+#   FOOT: all other 9x combat skills (incl. Conlon 372/375, DM PhiTieu 342, TN Dao 362, ...)
+# 150 upgrades with HorseLimit!=0 stay FOOT even if branch is mounted.
 VERIFIED_HORSE_ALLOWLIST = {
-    # Thieu Lam Dao — Vo Tuong Tram line
+    # Thieu Lam Dao — Vo Tuong Tram
     321,
     1057,
-    13,  # Lap Dia Thanh Phat (HL=0, dao branch ranged)
-    # Thien Vuong Dao — Pha Thien Tram line (1059 HL=1 excluded)
+    13,
+    # Thien Vuong Dao — Pha Thien Tram (1059 HL=1 excluded)
     322,
-    32,  # Vo Dich / Vo Tam Tram HL=0 melee mounted
-    # Duong Mon Tu Tien (amkhi) — Bao Vu Le Hoa (1069 HL=1 excluded)
+    32,
+    # Duong Mon Tu Tien — Bao Vu Le Hoa (1069 HL=1 excluded)
     302,
-    # Ngu Doc Dao — Huyen Am Tram line
+    # Ngu Doc Dao — Huyen Am Tram
     355,
     1067,
     74,
     64,
-    # Thien Nhan Van Long (repo branch key "dao"; skill ID is authority)
-    # 1076 HL=1 excluded
+    # Thien Nhan Van Long (repo branch key may say "dao"; skill ID wins)
     361,
+}
+
+# User canonical 9x matrix (horse, near). near=1 melee/trap, near=0 ranged.
+# Used by validator + report; horse must match VERIFIED_HORSE_ALLOWLIST intersection.
+USER_CANONICAL_9X = {
+    318: (0, 1),  # TL Quyen Dat Ma — FOOT melee
+    319: (0, 1),  # TL Bong Hoanh Tao — FOOT melee
+    321: (1, 0),  # TL Dao Vo Tuong — MOUNT ranged
+    323: (0, 1),  # TV Thuong Truy Tinh — FOOT melee
+    322: (1, 1),  # TV Dao Pha Thien — MOUNT melee
+    325: (0, 1),  # TV Chuy Truy Phong — FOOT melee
+    302: (1, 0),  # DM Tu Tien Bao Vu — MOUNT long
+    342: (0, 0),  # DM Phi Tieu Cuu Cung — FOOT ranged
+    339: (0, 0),  # DM Phi Dao Nhiep Hon — FOOT ranged
+    351: (0, 1),  # DM Bay Loan Hoan — FOOT trap
+    355: (1, 0),  # ND Dao Huyen Am — MOUNT ranged
+    353: (0, 0),  # ND Chuong Am Phong — FOOT ranged
+    328: (0, 0),  # NM Kiem Tam Nga — FOOT ranged
+    380: (0, 0),  # NM Chuong Phong Suong — FOOT ranged (skills.txt IsMelee wrongly 1)
+    336: (0, 0),  # TY Don Dao Bang Tung — FOOT ranged
+    337: (0, 0),  # TY Song Dao Bang Tam — FOOT ranged
+    357: (0, 0),  # CB Chuong Phi Long — FOOT ranged
+    359: (0, 0),  # CB Bong Thien Ha — FOOT ranged
+    361: (1, 1),  # TN Mau Van Long — MOUNT melee
+    362: (0, 0),  # TN Dao Thien Ngoai — FOOT ranged
+    368: (0, 1),  # VD Kiem Nhan Kiem — FOOT melee
+    365: (0, 0),  # VD Khi Thien Dia — FOOT long
+    372: (0, 0),  # CL Dao Ngao Tuyet — FOOT ranged
+    375: (0, 0),  # CL Kiem Loi Dong — FOOT long
 }
 
 # Trap / placement skills (not projectile target-cast)
@@ -118,6 +148,9 @@ def skill_type(sid: int, ar_px: int, is_melee: int) -> str:
         return "trap"
     if sid in SUPPORT_SKILLS:
         return "support"
+    # AttackRadius wins over skills.txt IsMelee (e.g. 380 Phong Suong AR=400 but IsMelee=1)
+    if ar_px > 120:
+        return "ranged"
     if is_melee == 1 or (ar_px > 0 and ar_px <= 120):
         return "melee"
     if ar_px <= 0:
@@ -455,11 +488,8 @@ def main():
     report.append("")
     report.append("## High-priority matrix check")
     report.append("")
-    expect = {
-        318: 0, 319: 0, 321: 1, 322: 1, 302: 1, 342: 0, 351: 0,
-        355: 1, 336: 0, 337: 0, 361: 1, 362: 0, 368: 0, 375: 0,
-        323: 0, 325: 0, 1059: 0, 1069: 0, 1076: 0,
-    }
+    expect = dict((sid, h) for sid, (h, _near) in USER_CANONICAL_9X.items())
+    expect.update({1059: 0, 1069: 0, 1076: 0})
     report.append("| ID | Expected Mounted | Actual | Pass |")
     report.append("|---:|---|---|---|")
     for sid, exp in sorted(expect.items()):
