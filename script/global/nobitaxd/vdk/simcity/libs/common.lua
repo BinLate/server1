@@ -17,23 +17,34 @@ if not GetNpcAroundNpcList then
     end
 end
 
-function split(szFullString, szSeparator)
-    if not szFullString or szFullString == "" then return {} end
-    szSeparator = szSeparator or "_"
-    local nFindStartIndex = 1
-    local nSplitIndex = 1
-    local nSplitArray = {}
-    while true do
-        local nFindLastIndex = strfind(szFullString, szSeparator, nFindStartIndex, 1)
-        if not nFindLastIndex then
-            nSplitArray[nSplitIndex] = strsub(szFullString, nFindStartIndex, strlen(szFullString))
-            break
+-- IMPORTANT: do NOT redefine split() here.
+-- A previous custom split used strfind(s, sep, init, 1) (Lua 5 "plain" flag).
+-- Kingsoft Lua 4.0 does not handle that 4th arg correctly, so "_" never matched,
+-- nodeNameToCoords failed on every "x_y", and loadMap dropped all preset nodes.
+-- Prefer script/lib/string.lua split (loaded by head.lua). Provide fallback if absent.
+if not split then
+    function split(str, splitor)
+        if splitor == nil then
+            splitor = ","
         end
-        nSplitArray[nSplitIndex] = strsub(szFullString, nFindStartIndex, nFindLastIndex - 1)
-        nFindStartIndex = nFindLastIndex + strlen(szSeparator)
-        nSplitIndex = nSplitIndex + 1
+        local strArray = {}
+        local strStart = 1
+        local splitorLen = strlen(splitor)
+        local index = strfind(str, splitor, strStart)
+        if index == nil then
+            strArray[1] = str
+            return strArray
+        end
+        local i = 1
+        while index do
+            strArray[i] = strsub(str, strStart, index - 1)
+            i = i + 1
+            strStart = index + splitorLen
+            index = strfind(str, splitor, strStart)
+        end
+        strArray[i] = strsub(str, strStart, strlen(str))
+        return strArray
     end
-    return nSplitArray
 end
 
 -- Helpers
@@ -319,8 +330,7 @@ end
 
 
 -- Strip CR/LF/spaces that TabFile or CRLF text files leave on cells.
--- Without this, names like "1881_2598\r" make tonumber(y) nil, poison
--- world.nodes with x/y=nil, then loadMap dies on arithmetic at link pass.
+-- Without this, names like "1881_2598\r" make tonumber(y) nil and poison world.nodes.
 function SimCityTrimCell(s)
     if s == nil then
         return ""
@@ -343,6 +353,8 @@ function SimCityTrimCell(s)
     return s
 end
 
+-- Same contract as server1-goc: split on "_", tonumber both parts.
+-- Callers must treat nil x/y as "skip this node" ù never insert into world.nodes.
 function nodeNameToCoords(nodeName)
     if nodeName == nil then
         return nil, nil
@@ -351,18 +363,9 @@ function nodeNameToCoords(nodeName)
     if nodeName == "" then
         return nil, nil
     end
-    -- Do NOT use getn(point): Kingsoft split() assigns by index without
-    -- setn/tinsert, so getn can be 0 even when point[1]/point[2] are valid.
-    -- That false-negative dropped every preset node (console spam).
     local point = split(nodeName, "_")
-    if (not point) or (point[1] == nil) or (point[2] == nil) or (point[3] ~= nil) then
-        return nil, nil
-    end
-    local x = tonumber(SimCityTrimCell(point[1]))
-    local y = tonumber(SimCityTrimCell(point[2]))
-    if (x == nil) or (y == nil) then
-        return nil, nil
-    end
+    local x = tonumber(point[1])
+    local y = tonumber(point[2])
     return x, y
 end
 

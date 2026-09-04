@@ -122,28 +122,19 @@ function loadMap()
             for i=1, getn(foundWalkPath) do
                 
                 local col = foundWalkPath[i]
-                local nodeName = col[1]
+                local nodeName = SimCityTrimCell(col[1])
 
                 local x, y = nodeNameToCoords(nodeName)
-                if x and y then
-                    local canonName = format("%d_%d", x, y)
-                    if i == 1 then
+                -- Never insert a node without numeric coords (graph poison -> crash)
+                if x ~= nil and y ~= nil then
+                    if i == 1 or world.firstNode == nil then
                         world.firstNode = {x, y}
                     end
-                    local linkedRaw = split(col[2], ",")
-                    local linkedNodes = {}
-                    if linkedRaw then
-                        for li = 1, getn(linkedRaw) do
-                            local ln = SimCityTrimCell(linkedRaw[li])
-                            if ln ~= "" then
-                                tinsert(linkedNodes, ln)
-                            end
-                        end
-                    end
+                    local linkedNodes = split(col[2], ",")
                     local isExact = col[3]
                     local nodeType = col[4]
                     
-                    allNodes[canonName] = {
+                    allNodes[nodeName] = {
                         x = x,
                         y = y,
                         linkedNodes = linkedNodes, 
@@ -157,7 +148,7 @@ function loadMap()
                         for j=1, getn(mapAtractions[worldId]) do
                             local atraction = mapAtractions[worldId][j]
                             if GetDistanceRadius(x, y, atraction[1], atraction[2]) < 8 then
-                                allNodes[canonName].isNearAtraction = atraction[3]
+                                allNodes[nodeName].isNearAtraction = atraction[3]
                                 break
                             end
                         end
@@ -173,11 +164,11 @@ function loadMap()
                 end
             end
             world.attractionNodes = anodes
-            -- Da Tau: tim toa do Da Tau (match mo ta) -> daTauNodes (node quanh do <10 o) cho stall tu tap dong.
+            -- Da Tau: tim toa do Da Tau (match mo ta) -> daTauNodes
             local _dtx, _dty
             if mapAtractions[worldId] then
                 for j=1, getn(mapAtractions[worldId]) do
-                    if mapAtractions[worldId][j][4] == "Dù Tùu" then _dtx = mapAtractions[worldId][j][1]; _dty = mapAtractions[worldId][j][2]; break end
+                    if mapAtractions[worldId][j][4] == "D∑ T»u" then _dtx = mapAtractions[worldId][j][1]; _dty = mapAtractions[worldId][j][2]; break end
                 end
             end
             local dtnodes = {}
@@ -206,7 +197,7 @@ function loadMap()
             local allPaths = {}
             for i=1, getn(foundWalkMap) do
                 local pathName = foundWalkMap[i][1]
-                local nodeName = foundWalkMap[i][2]
+                local nodeName = SimCityTrimCell(foundWalkMap[i][2])
 
                 if not allPaths[pathName] then
                     allPaths[pathName] = {}
@@ -239,9 +230,12 @@ function loadMap()
         local entry = haudoanhData[i]
         local worldId = entry[1]
         local campName = entry[2]
-        local nodeName = entry[3]
+        local nodeName = SimCityTrimCell(entry[3])
 
         if SimCityMap[worldId] then
+            if not SimCityMap[worldId].presetPaths then
+                SimCityMap[worldId].presetPaths = {}
+            end
             if not SimCityMap[worldId].presetPaths[campName] then
                 SimCityMap[worldId].presetPaths[campName] = {}
             end
@@ -249,34 +243,23 @@ function loadMap()
         end
     end
 
-    -- Final touch, for those missing node definition in preset paths
-    -- Root integrity: never insert a node without numeric x,y. CRLF-tainted
-    -- names ("1881_2598\r") used to poison the graph and crash link arithmetic.
+    -- Final touch: same flow as server1-goc, but never insert nil x/y nodes
     for worldId, world in SimCityMap do
         if world.presetPaths then
+            if not world.nodes then
+                world.nodes = {}
+            end
             for presetName, preset in world.presetPaths do
-                local writeIdx = 1
                 for i=1, getn(preset) do
                     local nodeName = preset[i]
-                    local x, y = nodeNameToCoords(nodeName)
-                    if (not x) or (not y) then
-                        -- rare: truly unparsable waypoint (keep log quiet after first few)
-                        if not _SIMCITY_DROP_NODE_LOG then _SIMCITY_DROP_NODE_LOG = 0 end
-                        if _SIMCITY_DROP_NODE_LOG < 5 then
-                            _SIMCITY_DROP_NODE_LOG = _SIMCITY_DROP_NODE_LOG + 1
-                            print("loadMap: drop invalid preset node world="..tostring(worldId).." path="..tostring(presetName).." node="..tostring(nodeName))
-                        end
-                    else
-                        -- canonical key without CR/spaces so preset matches nodes table
-                        local canonName = format("%d_%d", x, y)
-                        if not world.nodes[canonName] and world.nodes[nodeName] then
-                            canonName = nodeName
-                        end
-                        if not world.nodes[canonName] then
+                    if not world.nodes[nodeName] then
+                        local x, y = nodeNameToCoords(nodeName)
+                        if x ~= nil and y ~= nil then
+
                             local snappedNode = nil
                             local minDist = 8
                             for existingNode, nodeData in world.nodes do
-                                if nodeData and nodeData.x and nodeData.y then
+                                if nodeData and nodeData.x ~= nil and nodeData.y ~= nil then
                                     local dist = GetDistanceRadius(x, y, nodeData.x, nodeData.y)
                                     if dist <= minDist then
                                         snappedNode = existingNode
@@ -285,15 +268,15 @@ function loadMap()
                                 end
                             end
 
-                            local testNode = canonName
+                            local testNode = nodeName
                             if snappedNode then
                                 testNode = snappedNode
                             end
 
                             if world.nodes[testNode] and world.nodes[testNode].isNotPreset == 1 then
-                                canonName = testNode
+                                preset[i] = testNode
                             else
-                                world.nodes[canonName] = {
+                                world.nodes[nodeName] = {
                                     nodeType = 1,
                                     x = x,
                                     y = y,
@@ -304,20 +287,20 @@ function loadMap()
                                 }
 
                                 for otherNodeName, otherNode in world.nodes do
-                                    if otherNodeName ~= canonName and otherNode and otherNode.x and otherNode.y then
+                                    if otherNodeName ~= testNode and otherNodeName ~= nodeName and otherNode and otherNode.x ~= nil and otherNode.y ~= nil then
                                         if GetDistanceRadius(x, y, otherNode.x, otherNode.y) <= 16 then
-                                            tinsert(world.nodes[canonName].linkedNodes, otherNodeName)
+                                            tinsert(world.nodes[nodeName].linkedNodes, otherNodeName)
 
                                             local found = 0
                                             if otherNode.isNotPreset == 0 then
                                                 for j=1, getn(otherNode.linkedNodes) do
-                                                    if otherNode.linkedNodes[j] == canonName then
+                                                    if otherNode.linkedNodes[j] == nodeName then
                                                         found = 1
                                                         break
                                                     end
                                                 end
                                                 if found == 0 then
-                                                    tinsert(otherNode.linkedNodes, canonName)
+                                                    tinsert(otherNode.linkedNodes, nodeName)
                                                 end
                                             end
                                         end
@@ -325,13 +308,7 @@ function loadMap()
                                 end
                             end
                         end
-                        preset[writeIdx] = canonName
-                        writeIdx = writeIdx + 1
                     end
-                end
-                -- compact path after dropping invalid waypoints
-                while getn(preset) >= writeIdx do
-                    preset[getn(preset)] = nil
                 end
             end
 

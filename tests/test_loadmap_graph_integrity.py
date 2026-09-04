@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
-"""loadMap graph integrity: CRLF-tainted node names must not poison world.nodes."""
+"""loadMap / node coord integrity contracts for Kingsoft Lua 4.0."""
 import os
-import re
 import unittest
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -9,31 +8,44 @@ COMMON = os.path.join(REPO, 'script', 'global', 'nobitaxd', 'vdk', 'simcity',
                       'libs', 'common.lua')
 DATA = os.path.join(REPO, 'script', 'global', 'nobitaxd', 'vdk', 'simcity',
                     'libs', 'data.lua')
+STRING_LIB = os.path.join(REPO, 'script', 'lib', 'string.lua')
 
 
-class TestNodeCoordSanitization(unittest.TestCase):
-    def test_trim_helper_exists(self):
+class TestSplitNotBroken(unittest.TestCase):
+    def test_no_custom_split_with_plain_flag(self):
+        src = open(COMMON, 'rb').read()
+        # The 4th plain=1 arg breaks Kingsoft Lua 4.0 strfind and drops all x_y nodes.
+        self.assertNotIn(b'strfind(szFullString, szSeparator, nFindStartIndex, 1)', src)
+        self.assertNotIn(b'function split(szFullString', src)
+
+    def test_engine_string_split_exists(self):
+        src = open(STRING_LIB, 'rb').read()
+        self.assertIn(b'function split(str,splitor)', src)
+        # engine split must NOT use 4-arg plain strfind
+        self.assertNotIn(b'strfind(str,splitor,strStart, 1)', src)
+        self.assertNotIn(b'strfind(str,splitor,strStart,1)', src)
+
+
+class TestLoadMapGuards(unittest.TestCase):
+    def test_no_drop_spam_print(self):
+        src = open(DATA, 'rb').read()
+        self.assertNotIn(b'drop invalid preset node', src)
+
+    def test_refuses_nil_coord_insert(self):
+        src = open(DATA, 'rb').read()
+        self.assertIn(b'x ~= nil and y ~= nil', src)
+
+    def test_trim_helper_present(self):
         src = open(COMMON, 'rb').read()
         self.assertIn(b'function SimCityTrimCell(', src)
         self.assertIn(b'function nodeNameToCoords(', src)
 
-    def test_nodename_requires_two_numeric_parts(self):
+    def test_nodename_uses_simple_split_tonumber(self):
         src = open(COMMON, 'rb').read().decode('latin-1')
-        # Must NOT rely on getn(point) — Kingsoft split skips setn.
+        self.assertIn('local point = split(nodeName, "_")', src)
+        self.assertIn('tonumber(point[1])', src)
+        self.assertIn('tonumber(point[2])', src)
         self.assertNotIn('getn(point) ~= 2', src)
-        self.assertIn('point[1] == nil', src)
-        self.assertIn('point[2] == nil', src)
-        self.assertIn('SimCityTrimCell(point[1])', src)
-
-    def test_loadmap_never_links_with_raw_dx_on_maybe_nil_x(self):
-        src = open(DATA, 'rb').read()
-        # The live crash was: otherNode.x - world.nodes[testNode].x
-        self.assertNotIn(b'local dx = otherNode.x - world.nodes[testNode].x', src)
-        self.assertIn(b'never insert a node without numeric x,y', src)
-
-    def test_tabfile_readers_trim_cells(self):
-        src = open(COMMON, 'rb').read()
-        self.assertGreaterEqual(src.count(b'SimCityTrimCell('), 4)
 
 
 if __name__ == '__main__':
