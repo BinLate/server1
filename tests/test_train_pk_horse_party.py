@@ -26,7 +26,8 @@ class TestTrainPkHorseParty(unittest.TestCase):
 
     def test_horse_skills_match_skills_txt(self):
         src = open(os.path.join(SIM, "components", "sim.skill_meta.lua"), encoding="ascii", errors="replace").read()
-        self.assertIn("[318]={horse=1", src)
+        self.assertIn("[318]={horse=0", src)
+        self.assertIn("[375]={horse=0", src)
         self.assertIn("function SimSkillMeta:CanCastOnHorse", src)
 
     def test_botmount_uses_cancastonhorse(self):

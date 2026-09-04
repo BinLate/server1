@@ -3,7 +3,7 @@ import csv
 rows = list(csv.DictReader(open("settings/skills.txt", "r", encoding="latin1"), delimiter="\t"))
 lines = []
 lines.append("-- AUTO-GENERATED from settings/skills.txt - do not hand edit")
-lines.append("-- HorseLimit: 1 = can cast on horse (allowlist); 0 = MUST dismount (default deny)")
+lines.append("-- HorseLimit: 0 = may cast on horse; >=1 = MUST dismount (default deny for unknown)")
 lines.append("-- AttackRadius: pixels; tiles = max(1, floor(AR/32)); AR=0 -> melee failsafe 2 tiles")
 lines.append("SimSkillMeta = SimSkillMeta or {}")
 lines.append("SimSkillMeta.byId = {")
@@ -24,7 +24,8 @@ for row in rows:
         melee = int(row.get("IsMelee") or 0)
     except Exception:
         melee = 0
-    horse = 1 if hl >= 1 else 0
+    horse = 1 if hl == 0 else 0
+    # HorseLimit: 0 = no restriction (may cast mounted); >=1 = restricted (MUST dismount)
     if ar <= 0:
         tiles = 2
         ar_out = 64

@@ -26,11 +26,14 @@ class TestSimSkillMeta(unittest.TestCase):
         self.assertIn("function SimSkillMeta:CanCastOnHorse", src)
         self.assertIn("HorseLimit: 1 = can cast on horse", src)
         # 318 is HL=1 melee
-        self.assertIn("[318]={horse=1", src)
-        # 302 is HL=0 -> horse=0
-        self.assertIn("[302]={horse=0", src)
+        self.assertIn("[318]={horse=0", src)
+        # 302 HL=0 -> may mount
+        self.assertIn("[302]={horse=1", src)
         self.assertEqual(by_txt[318][0], 1)
         self.assertEqual(by_txt[302][0], 0)
+        # Loi Dong Cuu Thien must dismount
+        self.assertIn("[375]={horse=0", open(META, encoding="ascii", errors="replace").read())
+        self.assertIn("HorseLimit: 0 = may cast on horse", src)
 
     def test_core_pending_skill_api(self):
         core = open(os.path.join(SIM, "components", "sim.core.lua"), encoding="utf-8", errors="replace").read()

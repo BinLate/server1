@@ -148,13 +148,13 @@ function SimApplyHorseCombat(tbNpc, skillId)
     end
 
     if canHorse == 0 then
-        -- DEFAULT DENY: dismount BEFORE cast
-        if SetNpcRideHorse and tbNpc.isCurrentlyRiding ~= 0 then
-            SetNpcRideHorse(tbNpc.finalIndex, 0)
-        end
+        -- HorseLimit>=1: MUST dismount BEFORE cast
+        if SetNpcRideHorse then SetNpcRideHorse(tbNpc.finalIndex, 0) end
+        if BotMountSync then BotMountSync(tbNpc.finalIndex, 0) end
         tbNpc.isCurrentlyRiding = 0
         tbNpc.lastRideWant = 0
     else
+        -- HorseLimit==0: may remain mounted
         if SetNpcRideHorse and tbNpc.isCurrentlyRiding ~= 1 then
             SetNpcRideHorse(tbNpc.finalIndex, 1)
         end
@@ -326,6 +326,19 @@ function execCastNormalSkill(self, simInstance, tbNpc)
     SimFight:SetCombatState(tbNpc, SIM_COMBAT_STATE.COMBO, "casting combo")
     if SimMovement then SimMovement:SetState(tbNpc, SIM_MOVE_STATE.IDLE, "casting combo stationary") end
     SimApplyHorseCombat(tbNpc, skillId)
+    -- If skill forbids horse and we are still mounted, defer cast 1 tick
+    if SimSkillMeta and SimSkillMeta:CanCastOnHorse(skillId) ~= 1 then
+        local stillRide = 0
+        if GetNpcRideHorse then stillRide = GetNpcRideHorse(tbNpc.finalIndex) or 0 end
+        if stillRide == 1 or tbNpc.isCurrentlyRiding == 1 then
+            if SetNpcRideHorse then SetNpcRideHorse(tbNpc.finalIndex, 0) end
+            if BotMountSync then BotMountSync(tbNpc.finalIndex, 0) end
+            tbNpc.isCurrentlyRiding = 0
+            tbNpc.lastRideWant = 0
+            tbNpc.tick_canCast = tbNpc.tick_breath + 1
+            return
+        end
+    end
 
     if target.targetType == "player" then
         if BotDoSkill and target.npcIndex and target.npcIndex > 0 then

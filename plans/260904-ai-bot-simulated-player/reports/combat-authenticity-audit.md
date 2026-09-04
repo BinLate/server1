@@ -3,22 +3,18 @@
 Date: 2026-09-04
 HEAD: pending commit
 
-## A. HorseLimit semantics (THIS server)
+## A. HorseLimit semantics (THIS server) — CORRECTED 2026-09-04
 
-Verified from `settings/skills.txt`:
+Verified from `settings/skills.txt` + live bug (Loi Dong Cuu Thien on horse):
 
-| HorseLimit | Count | Meaning (authoritative for this repo) |
-|------------|-------|----------------------------------------|
-| 0 | 989 | **MUST dismount** before cast (default deny) |
-| 1 | 235 | **Allowlist**: may cast while mounted |
+| HorseLimit | Count | Meaning |
+|------------|-------|---------|
+| **0** | 989 | **May cast while mounted** (no restriction) |
+| **>=1** | 235 | **MUST dismount** before cast |
 
-Evidence:
+Example: skill **375 Loi Dong Cuu Thien** has `HorseLimit=1` → foot only.
 
-- Majority of skills are HL=0; horseback combat skills are the minority (fits VLTK design).
-- Known melee/ranged samples with HL=1 include 10, 17, 30, 318, 323, 328, 336, 342, …
-- Known foot-primary samples with HL=0 include 302, 321, 322, 361.
-
-Runtime policy: `SimSkillMeta:CanCastOnHorse(id)` → 1 only if HL>=1; **everything else → 0**.
+Earlier mistake treated HL>=1 as horse-OK (inverted). Fixed in `tools/gen_skill_meta.py` + regenerated `sim.skill_meta.lua`.
 
 ## B. AttackRadius
 
