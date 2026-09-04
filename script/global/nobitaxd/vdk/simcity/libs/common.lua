@@ -53,13 +53,13 @@ function GetTabFileData(path, tab_name, start_row, max_col) -- Doc file txt
     return tbData, nCount - start_row + 1
 end
 
-isChinese = { "<", ">", "ª¹", "³", "newboss", "²", "´", "åâ", "£¨", "¼ı", "ıË", "¼ş", "¼ş", "£", "º", "±", "¡", "»", "ÙÁ",
-    "±", "··", "ÈË" }
+isChinese = { "<", ">", "", "", "newboss", "", "", "", "", "", "", "", "", "", "", "", "", "", "",
+    "", "", "" }
 function fixName(inp)
     local found = false
     for i = 1, getn(isChinese) do
         if strfind(inp, isChinese[i]) ~= nil then
-            return "Qu¸i kh¸ch"
+            return "Qui khch"
         end
     end
     return inp
@@ -231,13 +231,13 @@ function SimCityTableFromFileFallback(strFilePatch, tbPattern)
 					if szCell == nil or szCell == "" then
 						tinsert(tbRow, 0)
 					else
-						tinsert(tbRow, tonumber(szCell) or 0)
+						tinsert(tbRow, tonumber(SimCityTrimCell(szCell)) or 0)
 					end
 				else
 					if szCell == nil then
 						tinsert(tbRow, "")
 					else
-						tinsert(tbRow, szCell)
+						tinsert(tbRow, SimCityTrimCell(szCell))
 					end
 				end
 			end
@@ -267,17 +267,18 @@ function SimCityTableFromFile(strFilePatch, tbPattern)
 				local tmp = nil
 				if tbPattern[j] == "*n" then
                     local cell = TabFile_GetCell(strFilePatch, i, j)
+                    cell = SimCityTrimCell(cell)
                     if cell == nil or cell == "" then
                         tmp = 0
                     else
-                        tmp = tonumber(cell)
+                        tmp = tonumber(cell) or 0
                     end
 				elseif tbPattern[j] == "*w" then
                     local cell = TabFile_GetCell(strFilePatch, i, j)
                     if cell == nil or cell == "" then
                         tmp = ""
                     else
-                        tmp = tostring(cell)
+                        tmp = SimCityTrimCell(tostring(cell))
                     end
 				end
 				tinsert(tbResult[i-1], tmp)
@@ -317,10 +318,48 @@ function getClosestNode(nodes, nX, nY)
 end
 
 
+-- Strip CR/LF/spaces that TabFile or CRLF text files leave on cells.
+-- Without this, names like "1881_2598\r" make tonumber(y) nil, poison
+-- world.nodes with x/y=nil, then loadMap dies on arithmetic at link pass.
+function SimCityTrimCell(s)
+    if s == nil then
+        return ""
+    end
+    s = tostring(s)
+    while strfind(s, "\r") do
+        local i = strfind(s, "\r")
+        s = strsub(s, 1, i - 1) .. strsub(s, i + 1)
+    end
+    while strfind(s, "\n") do
+        local i = strfind(s, "\n")
+        s = strsub(s, 1, i - 1) .. strsub(s, i + 1)
+    end
+    while strsub(s, 1, 1) == " " or strsub(s, 1, 1) == "\t" do
+        s = strsub(s, 2)
+    end
+    while strlen(s) > 0 and (strsub(s, strlen(s)) == " " or strsub(s, strlen(s)) == "\t") do
+        s = strsub(s, 1, strlen(s) - 1)
+    end
+    return s
+end
+
 function nodeNameToCoords(nodeName)
+    if nodeName == nil then
+        return nil, nil
+    end
+    nodeName = SimCityTrimCell(nodeName)
+    if nodeName == "" then
+        return nil, nil
+    end
     local point = split(nodeName, "_")
-    local x = tonumber(point[1])
-    local y = tonumber(point[2])
+    if (not point) or getn(point) ~= 2 then
+        return nil, nil
+    end
+    local x = tonumber(SimCityTrimCell(point[1]))
+    local y = tonumber(SimCityTrimCell(point[2]))
+    if (x == nil) or (y == nil) then
+        return nil, nil
+    end
     return x, y
 end
 
@@ -348,25 +387,25 @@ end
 function faction2DisplayName(faction)
     local tbSay = {}
     if faction == 1 then
-        return "Thiªn V­¬ng Bang"
+        return "Thin Vng Bang"
     elseif faction == 2 then
-        return "ThiÕu L©m"
+        return "Thiu Lm"
     elseif faction == 3 then
-        return "Vâ §ang"
+        return "V ang"
     elseif faction == 4 then
-        return "C«n L«n"
+        return "Cn Ln"
     elseif faction == 5 then
-        return "§­êng M«n"
+        return "ng Mn"
     elseif faction == 6 then
-        return "Ngò §éc"
+        return "Ng c"
     elseif faction == 7 then
         return "Nga Mi"
     elseif faction == 8 then
-        return "Thóy Yªn"
+        return "Thy Yn"
     elseif faction == 9 then
-        return "C¸i Bang"
+        return "Ci Bang"
     elseif faction == 10 then
-        return "Thiªn NhÉn"
+        return "Thin Nhn"
     end
 end
 

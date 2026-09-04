@@ -126,14 +126,24 @@ function loadMap()
 
                 local x, y = nodeNameToCoords(nodeName)
                 if x and y then
+                    local canonName = format("%d_%d", x, y)
                     if i == 1 then
                         world.firstNode = {x, y}
                     end
-                    local linkedNodes = split(col[2], ",")
+                    local linkedRaw = split(col[2], ",")
+                    local linkedNodes = {}
+                    if linkedRaw then
+                        for li = 1, getn(linkedRaw) do
+                            local ln = SimCityTrimCell(linkedRaw[li])
+                            if ln ~= "" then
+                                tinsert(linkedNodes, ln)
+                            end
+                        end
+                    end
                     local isExact = col[3]
                     local nodeType = col[4]
                     
-                    allNodes[nodeName] = {
+                    allNodes[canonName] = {
                         x = x,
                         y = y,
                         linkedNodes = linkedNodes, 
@@ -147,7 +157,7 @@ function loadMap()
                         for j=1, getn(mapAtractions[worldId]) do
                             local atraction = mapAtractions[worldId][j]
                             if GetDistanceRadius(x, y, atraction[1], atraction[2]) < 8 then
-                                allNodes[nodeName].isNearAtraction = atraction[3]
+                                allNodes[canonName].isNearAtraction = atraction[3]
                                 break
                             end
                         end
@@ -193,7 +203,7 @@ function loadMap()
         if fileType == "preset" then
             local foundWalkMap = SimCityTableFromFile(mapPath.. filePath, {"*w", "*w"})
 
-            allPaths = {}
+            local allPaths = {}
             for i=1, getn(foundWalkMap) do
                 local pathName = foundWalkMap[i][1]
                 local nodeName = foundWalkMap[i][2]
@@ -240,71 +250,83 @@ function loadMap()
     end
 
     -- Final touch, for those missing node definition in preset paths
+    -- Root integrity: never insert a node without numeric x,y. CRLF-tainted
+    -- names ("1881_2598\r") used to poison the graph and crash link arithmetic.
     for worldId, world in SimCityMap do
         if world.presetPaths then
             for presetName, preset in world.presetPaths do
+                local writeIdx = 1
                 for i=1, getn(preset) do
                     local nodeName = preset[i]
-                    if not world.nodes[nodeName] then
-                        local x, y = nodeNameToCoords(nodeName)
-
-                        -- Try to snap to existing nodes within 16 radius
-                        local snappedNode = nil
-                        local minDist = 8
-                        for existingNode, nodeData in world.nodes do
-                            local dist = GetDistanceRadius(x, y, nodeData.x, nodeData.y)
-                            if dist <= minDist then
-                                snappedNode = existingNode
-                                minDist = dist
+                    local x, y = nodeNameToCoords(nodeName)
+                    if (not x) or (not y) then
+                        print("loadMap: drop invalid preset node world="..tostring(worldId).." path="..tostring(presetName).." node="..tostring(nodeName))
+                    else
+                        -- canonical key without CR/spaces so preset matches nodes table
+                        local canonName = format("%d_%d", x, y)
+                        if not world.nodes[canonName] and world.nodes[nodeName] then
+                            canonName = nodeName
+                        end
+                        if not world.nodes[canonName] then
+                            local snappedNode = nil
+                            local minDist = 8
+                            for existingNode, nodeData in world.nodes do
+                                if nodeData and nodeData.x and nodeData.y then
+                                    local dist = GetDistanceRadius(x, y, nodeData.x, nodeData.y)
+                                    if dist <= minDist then
+                                        snappedNode = existingNode
+                                        minDist = dist
+                                    end
+                                end
                             end
-                        end
 
-                        -- Replace current preset node with snapped node if found
-                        local testNode = nodeName
-                        if snappedNode then
-                            testNode = snappedNode
-                        end
+                            local testNode = canonName
+                            if snappedNode then
+                                testNode = snappedNode
+                            end
 
-                        if world.nodes[testNode] and world.nodes[testNode].isNotPreset == 1 then
-                            preset[i] = testNode
-                        else
-                            world.nodes[nodeName] = {
-                                nodeType = 1,
-                                x = x,
-                                y = y,
-                                linkedNodes = {},
-                                isExact = 0,
-                                isNearAtraction = 0,
-                                isNotPreset = 0
-                            }
-                        
-                            -- Find linked nodes within 16 radius
-                            for otherNodeName, otherNode in world.nodes do
-                                if otherNodeName ~= testNode and otherNodeName ~= nodeName then
-                                    local dx = otherNode.x - world.nodes[testNode].x
-                                    local dy = otherNode.y - world.nodes[testNode].y
-                                    
-                                    if GetDistanceRadius(x, y, otherNode.x, otherNode.y) <= 16 then
-                                        tinsert(world.nodes[nodeName].linkedNodes, otherNodeName)
-                                        
-                                        -- Add this node to the other node's linkedNodes that other was not preset
-                                        local found = 0
-                                        if otherNode.isNotPreset == 0 then
-                                            for j=1, getn(otherNode.linkedNodes) do
-                                                if otherNode.linkedNodes[j] == nodeName then
-                                                    found = 1
-                                                    break
+                            if world.nodes[testNode] and world.nodes[testNode].isNotPreset == 1 then
+                                canonName = testNode
+                            else
+                                world.nodes[canonName] = {
+                                    nodeType = 1,
+                                    x = x,
+                                    y = y,
+                                    linkedNodes = {},
+                                    isExact = 0,
+                                    isNearAtraction = 0,
+                                    isNotPreset = 0
+                                }
+
+                                for otherNodeName, otherNode in world.nodes do
+                                    if otherNodeName ~= canonName and otherNode and otherNode.x and otherNode.y then
+                                        if GetDistanceRadius(x, y, otherNode.x, otherNode.y) <= 16 then
+                                            tinsert(world.nodes[canonName].linkedNodes, otherNodeName)
+
+                                            local found = 0
+                                            if otherNode.isNotPreset == 0 then
+                                                for j=1, getn(otherNode.linkedNodes) do
+                                                    if otherNode.linkedNodes[j] == canonName then
+                                                        found = 1
+                                                        break
+                                                    end
                                                 end
-                                            end
-                                            if found == 0 then
-                                                tinsert(otherNode.linkedNodes, nodeName)
+                                                if found == 0 then
+                                                    tinsert(otherNode.linkedNodes, canonName)
+                                                end
                                             end
                                         end
                                     end
                                 end
                             end
                         end
+                        preset[writeIdx] = canonName
+                        writeIdx = writeIdx + 1
                     end
+                end
+                -- compact path after dropping invalid waypoints
+                while getn(preset) >= writeIdx do
+                    preset[getn(preset)] = nil
                 end
             end
 
