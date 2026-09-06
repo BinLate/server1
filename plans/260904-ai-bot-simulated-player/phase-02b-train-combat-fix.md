@@ -1,6 +1,6 @@
 # Phase 02b: Fix SimBot train combat (đánh quái + cày cấp)
 
-Status: 🔴 Ready to implement (chờ duyệt)
+Status: 🟢 Implemented & Decision Table Verified — in-game verify after GS restart
 Dependencies: Phase 02 slice spawn/AOI
 Evidence: Lâm Du Quan (map **319**) — bot đứng cạnh **Bôn Lôi**, không vào combat; trước đó Vũ Lăng Động (199) tương tự.
 

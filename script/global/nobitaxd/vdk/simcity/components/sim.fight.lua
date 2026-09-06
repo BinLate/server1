@@ -210,6 +210,16 @@ function LeaveFight(self, simInstance, tbNpc, isAllDead, reason)
         random(tbNpc.TIME_RESTING_minTs or TIME_RESTING.minTs,
             tbNpc.TIME_RESTING_maxTs or TIME_RESTING.maxTs)
     reason = reason or "no reason" 
+    if SIMBOT_COMBAT_DEBUG == 1 and Msg2Player and simInstance then
+        local pId = simInstance.GetPlayer and simInstance:GetPlayer(nListId)
+        if pId and pId > 0 then
+            Msg2Player(format("[SIMBOT_COMBAT_DEBUG] LeaveFight bot=%s mode=%s isAllDead=%s reason=%s",
+                tostring(tbNpc.szName or tbNpc.finalIndex),
+                tostring(tbNpc.mode),
+                tostring(isAllDead or 0),
+                tostring(reason or "none")))
+        end
+    end
     if (isAllDead ~= 1 and tbNpc.kind ~= 3 and (tbNpc.kind ~= 4 or tbNpc.isAttackable == 1)) then        
         self:SetFightState(tbNpc, 0)
     else
@@ -263,7 +273,25 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         SimParty:ShareAggroTarget(simInstance, tbNpc.virtualPartyId, target.npcIndex, tbNpc)
     end
 
-    local selectedSkill = SimPickSkill(tbNpc)
+    local selectedSkill = (SimPickSkill and SimPickSkill(tbNpc)) or tbNpc.skillCastBua or (tbNpc.faction and SimCityPhai and SimCityPhai[tbNpc.faction] and SimCityPhai[tbNpc.faction].normalCast and SimCityPhai[tbNpc.faction].normalCast[1])
+    if not selectedSkill and tbNpc.faction then
+        if SimProgression and SimProgression.FACTION_SKILLS and SimProgression.FACTION_SKILLS[tbNpc.faction] then
+            local fsk = SimProgression.FACTION_SKILLS[tbNpc.faction]
+            if fsk and fsk.main and fsk.main[1] then
+                selectedSkill = { fsk.main[1].id, 20 }
+            end
+        end
+        if not selectedSkill and SimSkillMeta and SimSkillMeta.byFaction and SimSkillMeta.byFaction[tbNpc.faction] then
+            local sf = SimSkillMeta.byFaction[tbNpc.faction]
+            if sf and sf[1] then selectedSkill = { sf[1], 20 } end
+        end
+        if not selectedSkill then
+            local defaultFacSkills = { ngami = 380, thieulam = 11, thienvuong = 36, duongmon = 42, ngudoc = 50, thuyyen = 70, caibang = 120, thiennhan = 130, vodang = 150, conlon = 160 }
+            if defaultFacSkills[tbNpc.faction] then
+                selectedSkill = { defaultFacSkills[tbNpc.faction], 20 }
+            end
+        end
+    end
     if not selectedSkill or not selectedSkill[1] then return end
     local skillId = selectedSkill[1]
     local baseSkillLv = selectedSkill[2] or 20
@@ -311,6 +339,8 @@ function execCastNormalSkill(self, simInstance, tbNpc)
     elseif SimSkillMeta and SimSkillMeta.Get then
         local meta = SimSkillMeta:Get(skillId)
         if meta and meta.melee ~= 1 and (meta.tiles or 0) >= 6 then isRanged = 1 end
+    elseif SimFight and SimFight.IsRangedFaction and tbNpc.faction then
+        isRanged = SimFight:IsRangedFaction(tbNpc.faction, tbNpc.weaponBranch)
     end
 
     -- Tactical kiting: If ranged bot and target is closer than 4 tiles
@@ -717,6 +747,16 @@ SimFight.Citizen = {
                         if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
                         -- Bind combat skill so engine AI prefers VFX skill, not bare auto-attack
                         if SetNpcCombat and sid > 0 then SetNpcCombat(tbNpc.finalIndex, 1, sid) end
+                        if (not tbNpc.foundNpcEnemy) or tbNpc.foundNpcEnemy <= 0 then
+                            local e = self:IsNpcEnemyAround(simInstance, tbNpc)
+                            if e and e > 0 then tbNpc.foundNpcEnemy = e end
+                        end
+                        if tbNpc.foundNpcEnemy and tbNpc.foundNpcEnemy > 0 and NpcRun and GetNpcPos then
+                            local _ex, _ey = GetNpcPos(tbNpc.foundNpcEnemy)
+                            if _ex and _ey then
+                                NpcRun(tbNpc.finalIndex, floor(_ex / 32), floor(_ey / 32))
+                            end
+                        end
                         if self.Update then self:Update(simInstance, tbNpc) end
                     else
                         self:SetFightState(tbNpc, 9, currX, currY)
@@ -739,7 +779,23 @@ SimFight.Citizen = {
                 local e = self:IsNpcEnemyAround(simInstance, tbNpc)
                 if e and e > 0 then tbNpc.foundNpcEnemy = e end
             end
+            if tbNpc.foundNpcEnemy and tbNpc.foundNpcEnemy > 0 and NpcRun and GetNpcPos then
+                local _ex, _ey = GetNpcPos(tbNpc.foundNpcEnemy)
+                if _ex and _ey then
+                    NpcRun(tbNpc.finalIndex, floor(_ex / 32), floor(_ey / 32))
+                end
+            end
             if self.Update then self:Update(simInstance, tbNpc) end
+            if SIMBOT_COMBAT_DEBUG == 1 and Msg2Player and simInstance then
+                local pId = simInstance.GetPlayer and simInstance:GetPlayer(nListId)
+                if pId and pId > 0 then
+                    Msg2Player(format("[SIMBOT_COMBAT_DEBUG] JoinFight bot=%s mode=%s enemy=%s reason=%s",
+                        tostring(tbNpc.szName or tbNpc.finalIndex),
+                        tostring(tbNpc.mode),
+                        tostring(tbNpc.foundNpcEnemy or 0),
+                        tostring(reason or "none")))
+                end
+            end
             return 1
         end
         tbNpc.entitySys:Respawn(simInstance, tbNpc, 3, "JoinFight " .. reason)      

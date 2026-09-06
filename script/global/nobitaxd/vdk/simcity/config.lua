@@ -41,6 +41,7 @@ TRAIN_DOSAT_PCT = 8               -- % bot train Do Sat (camp5) attack players; 
 TRAIN_SKILL_CAST_CD_TICKS = 1     -- train Lua cast cooldown (ticks); low = more faction skill VFX on Client
 AOI_SCAN_INTERVAL = 15            -- chu ky quet nguoi choi (giay)
 AOI_HIBERNATE_TIMEOUT = 120       -- thoi gian khong co nguoi choi se hibernate (giay)
+SIMBOT_COMBAT_DEBUG = 0           -- debug log for train/fight combat (0=off, 1=on)
 
 -- SIMBOT COMBAT SAFETY & LIMITS
 SIMBOT_MAX_LEVEL = 200            -- cap do toi da cua Simbot
