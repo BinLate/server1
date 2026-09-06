@@ -247,7 +247,11 @@ class TestPhaseASafety(unittest.TestCase):
             }
         }
         function SimCityWorld:Get(mapId)
-            return self.data[mapId]
+            if self.data[mapId] then return self.data[mapId] end
+            if SimCityLuyenCong and SimCityLuyenCong.findMapIndex and SimCityLuyenCong:findMapIndex(mapId) then
+                return defaultWorld53
+            end
+            return nil
         end
 
         SimCityNPCInfo = {
@@ -296,7 +300,7 @@ class TestPhaseASafety(unittest.TestCase):
         self.assertEqual(g.TONGKIM_SIMBOT_PER_CAMP, 5)
         self.assertEqual(g.TONGKIM_SIMBOT_TOTAL, 10)
         self.assertEqual(g.TRAIN_BOT_MAX_PER_MAP, 25)
-        self.assertEqual(g.TRAIN_BOT_GLOBAL_BUDGET, 200)
+        self.assertEqual(g.TRAIN_BOT_GLOBAL_BUDGET, 350)
         self.assertEqual(g.SIMBOT_MAX_LEVEL, 200)
         self.assertEqual(g.AOI_SCAN_INTERVAL, 15)
         self.assertEqual(g.AOI_HIBERNATE_TIMEOUT, 120)
@@ -385,9 +389,10 @@ class TestPhaseASafety(unittest.TestCase):
         res = self.lua.execute("""
         SimCityLuyenCong:init()
         
-        -- Spawn for map 1 (Ba Lang Huyen, count=15)
+        -- Spawn for map 1
         SimCityLuyenCong:spawnForMap(1)
         local mapId = SimCityLuyenCong.TRAIN_MAPS[1].mapId
+        local targetCount = SimCityLuyenCong.TRAIN_MAPS[1].count
         local count1 = SimCityLuyenCong:countBotsInMap(mapId)
 
         -- Repeated call to spawnForMap should NOT double count
@@ -398,18 +403,20 @@ class TestPhaseASafety(unittest.TestCase):
         SimCityLuyenCong:hibernateMap(mapId)
         local count3 = SimCityLuyenCong:countBotsInMap(mapId)
 
-        return count1, count2, count3
+        return count1, count2, count3, targetCount
         """)
-        count1, count2, count3 = res
-        self.assertEqual(count1, 15)
-        self.assertEqual(count2, 15)
+        count1, count2, count3, targetCount = res
+        self.assertEqual(count1, targetCount)
+        self.assertEqual(count2, targetCount)
         self.assertEqual(count3, 0)
 
     def test_aoi_atick_lifecycle_replenish_and_hibernate(self):
         self.init_simcity_environment()
         res = self.lua.execute("""
         SimCityLuyenCong:init()
-        local mapId = SimCityLuyenCong.TRAIN_MAPS[1].mapId -- Ba Lang Huyen (53), target=15
+        local mapIdx = SimCityLuyenCong:findMapIndex(53) or 14
+        local mapId = SimCityLuyenCong.TRAIN_MAPS[mapIdx].mapId
+        local targetCount = SimCityLuyenCong.TRAIN_MAPS[mapIdx].count
 
         -- Mock player on map 53: (mapId, x, y)
         GetPlayerCount = function() return 1 end
@@ -418,7 +425,7 @@ class TestPhaseASafety(unittest.TestCase):
         local simTime = 100
         GetGameTime = function() return simTime end
 
-        -- 1. First ATick spawns 15 bots
+        -- 1. First ATick spawns bots
         SimCityLuyenCong:ATick()
         local initialCount = SimCityLuyenCong:countBotsInMap(mapId)
 
@@ -432,7 +439,7 @@ class TestPhaseASafety(unittest.TestCase):
         end
         local countAfterKill = SimCityLuyenCong:countBotsInMap(mapId)
 
-        -- 3. Next ATick (player still present) replenishes back to 15
+        -- 3. Next ATick (player still present) replenishes back to targetCount
         simTime = simTime + 20
         SimCityLuyenCong:ATick()
         local countAfterReplenish = SimCityLuyenCong:countBotsInMap(mapId)
@@ -450,13 +457,13 @@ class TestPhaseASafety(unittest.TestCase):
         SimCityLuyenCong:ATick()
         local countAfterHibernate = SimCityLuyenCong:countBotsInMap(mapId)
 
-        return initialCount, countAfterKill, countAfterReplenish, countBeforeHibernate, countAfterHibernate
+        return initialCount, countAfterKill, countAfterReplenish, countBeforeHibernate, countAfterHibernate, targetCount
         """)
-        c_init, c_kill, c_rep, c_before_hib, c_after_hib = res
-        self.assertEqual(c_init, 15)
-        self.assertEqual(c_kill, 10)
-        self.assertEqual(c_rep, 15)
-        self.assertEqual(c_before_hib, 15)
+        c_init, c_kill, c_rep, c_before_hib, c_after_hib, targetCount = res
+        self.assertEqual(c_init, targetCount)
+        self.assertEqual(c_kill, targetCount - 5)
+        self.assertEqual(c_rep, targetCount)
+        self.assertEqual(c_before_hib, targetCount)
         self.assertEqual(c_after_hib, 0)
 
     def test_exec_cast_normal_skill_player_target_combat(self):

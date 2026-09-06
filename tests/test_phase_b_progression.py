@@ -284,7 +284,11 @@ class TestPhaseBProgression(unittest.TestCase):
             }
         }
         function SimCityWorld:Get(mapId)
-            return self.data[mapId]
+            if self.data[mapId] then return self.data[mapId] end
+            if SimCityLuyenCong and SimCityLuyenCong.findMapIndex and SimCityLuyenCong:findMapIndex(mapId) then
+                return defaultWorld53
+            end
+            return nil
         end
 
         SimCityNPCInfo = {
@@ -465,14 +469,16 @@ class TestPhaseBProgression(unittest.TestCase):
         self.init_simcity_environment()
         res = self.lua.execute("""
         SimCityLuyenCong:init()
-        local map1 = SimCityLuyenCong.TRAIN_MAPS[1].mapId -- 53 (Ba Lang Huyen, minLv=1, maxLv=20)
-        local map2 = SimCityLuyenCong.TRAIN_MAPS[2].mapId -- 11 (Phuc Nguu Son, minLv=20, maxLv=40)
+        local map1Idx = SimCityLuyenCong:findMapIndex(53) or 14
+        local map1 = SimCityLuyenCong.TRAIN_MAPS[map1Idx].mapId -- 53 (Ba Lang Huyen, minLv=10, maxLv=19)
+        local map2Idx = SimCityLuyenCong:findMapIndex(3) or 18
+        local map2 = SimCityLuyenCong.TRAIN_MAPS[map2Idx].mapId -- 3 (Kiem Cac Tay Bac, minLv=20, maxLv=29)
 
         -- 1. Spawn map 1
-        SimCityLuyenCong:spawnForMap(1)
+        SimCityLuyenCong:spawnForMap(map1Idx)
         local initialCount = SimCityLuyenCong:countBotsInMap(map1)
 
-        -- 2. Level up one bot in map 1 to level 25 (> 20 -> should trigger migration to map 2 upon hibernation)
+        -- 2. Level up one bot in map 1 to level 25 (> 19 -> should trigger migration to map 2 upon hibernation)
         for id, bot in pairs(SimCitizen.fighterList) do
             if bot.mode == "train" and bot.nMapId == map1 then
                 bot.level = 25
@@ -492,7 +498,7 @@ class TestPhaseBProgression(unittest.TestCase):
         local migratedLv = (map2MigratedCount > 0) and map2Roster[1].level or 0
 
         -- 4. Spawn Map 2 -> should awaken with the migrated bot
-        SimCityLuyenCong:spawnForMap(2)
+        SimCityLuyenCong:spawnForMap(map2Idx)
         local map2BotCount = SimCityLuyenCong:countBotsInMap(map2)
 
         return initialCount, countAfterHib == 0, map2MigratedCount > 0, migratedName, migratedLv, map2BotCount

@@ -156,6 +156,25 @@ class TestTrainCombatEngage(unittest.TestCase):
         self.assertNotIn("for bName, list in facTable do", src)
         self.assertNotIn("tbNpc.weaponBranch = bName", src)
 
+    def test_unknown_branch_returns_nil(self):
+        """Verify ResolveCanonicalBranch returns nil for unknown branch without falling through."""
+        src = self._read("sim.fight.lua")
+        func_idx = src.find("function SimFight:ResolveCanonicalBranch(tbNpc, fac)")
+        self.assertGreater(func_idx, 0)
+        func_chunk = src[func_idx : src.find("function ", func_idx + 10)]
+        self.assertIn("facTable exists and b is neither in facTable nor a recognized alias", func_chunk)
+        self.assertNotIn("return b\n    end\n\n    -- 2.", func_chunk)
+
+    def test_no_arbitrary_selection_for_any(self):
+        """Verify ResolveCanonicalBranch never picks arbitrary chuong/kiem/dao for 'any'."""
+        src = self._read("sim.fight.lua")
+        func_idx = src.find("function SimFight:ResolveCanonicalBranch(tbNpc, fac)")
+        self.assertGreater(func_idx, 0)
+        func_chunk = src[func_idx : src.find("function ", func_idx + 10)]
+        self.assertNotIn('b == "any" then', func_chunk)
+        self.assertNotIn('tb == "any" then', func_chunk)
+        self.assertNotIn('if facTable["chuong"] then return "chuong"\n            if facTable["kiem"]', func_chunk)
+
     def test_no_unconditional_hardcoded_selectedskill_fallback(self):
         """Verify execCastNormalSkill does not have unconditional {53, 1} fallback."""
         src = self._read("sim.fight.lua")
@@ -181,6 +200,16 @@ class TestTrainCombatEngage(unittest.TestCase):
         select_chunk = src[select_idx : select_idx + 3000]
         self.assertIn("NPCINFO_GetNpcCurrentLife(foundNpcEnemy)", select_chunk)
         self.assertIn("tbNpc.foundNpcEnemy = nil", select_chunk)
+
+
+def _convert_kingsoft_for_loops(src):
+    import re
+    def repl(m):
+        target = m.group(2).strip()
+        if '(' in target or target.startswith('pairs') or target.startswith('ipairs') or target.startswith('next'):
+            return m.group(0)
+        return f'for {m.group(1)} in pairs({target}) do'
+    return re.sub(r'\bfor\s+([a-zA-Z0-9_,\s]+)\s+in\s+([^()\r\n]+?)\s+do\b', repl, src)
 
 
 @unittest.skipUnless(HAS_LUPA, "lupa is not installed or not supported in this Python environment")
@@ -218,10 +247,10 @@ class TestTrainCombatDecisionTables(unittest.TestCase):
         """
         self.lua.execute(env_init)
         with open(os.path.join(ROOT, "sim.fight.lua"), "r", encoding="utf-8") as f:
-            fight_src = f.read()
+            fight_src = _convert_kingsoft_for_loops(f.read())
         self.lua.execute(fight_src)
         with open(os.path.join(ROOT, "sim.movement.lua"), "r", encoding="utf-8") as f:
-            mov_src = f.read()
+            mov_src = _convert_kingsoft_for_loops(f.read())
         self.lua.execute(mov_src)
 
     def test_decision_table_case2_leave_fight(self):
@@ -686,19 +715,22 @@ class TestTrainCombatDecisionTables(unittest.TestCase):
 
     def test_canonical_branch_resolution_and_no_arbitrary_mutation(self):
         """SimFight:ResolveCanonicalBranch deterministically resolves branch from
-        assigned branch, gear metadata (nNewWeaponType), or NPC template (SimBotNpc).
-        When resolution fails, tbNpc.weaponBranch is never mutated to an arbitrary branch."""
+        assigned branch, gear metadata (nNewWeaponType), NPC template (SimBotNpc),
+        or canonical skill metadata.
+        When resolution fails, tbNpc.weaponBranch is never mutated to an arbitrary branch.
+        Unknown branches return nil, and 'any' never picks an arbitrary branch."""
         test_script = """
         function evalBranchResolution()
             SimProgression = {
                 FACTION_SKILLS = {
                     thieulam = { quyen = {}, con = {}, dao = {} },
-                    vodang = { kiem = {}, chuong = {} },
+                    vodang = { kiem = {}, chuong = { { reqLv = 90, id = 365 } } },
                     thienvuong = { thuong = {}, dao = {}, chuy = {} }
                 }
             }
             SimBotNpc = {
-                [1907] = { 323, "thuong" }
+                [1907] = { 323, "thuong" },
+                [2020] = { 365, "any" }
             }
             -- 1. Assigned branch directly matching
             local b1 = SimFight:ResolveCanonicalBranch({ faction = "thieulam", weaponBranch = "dao" })
@@ -712,17 +744,48 @@ class TestTrainCombatDecisionTables(unittest.TestCase):
             local npc5 = { faction = "thieulam", weaponBranch = nil }
             local b5 = SimFight:ResolveCanonicalBranch(npc5)
             local mutatedBranch5 = npc5.weaponBranch
-            return b1, b2, b3, b4, b5, mutatedBranch5
+            -- 6. Regression: unknown_branch -> nil (never propagates unknown branch)
+            local npc6 = { faction = "thieulam", weaponBranch = "unknown_branch" }
+            local b6 = SimFight:ResolveCanonicalBranch(npc6)
+            local mutatedBranch6 = npc6.weaponBranch
+            -- 7. weaponBranch == "any" with NO metadata -> nil (never picks arbitrary chuong/kiem/dao)
+            local npc7_vd = { faction = "vodang", weaponBranch = "any" }
+            local b7_vd = SimFight:ResolveCanonicalBranch(npc7_vd)
+            local mutatedBranch7_vd = npc7_vd.weaponBranch
+            local npc7_tl = { faction = "thieulam", weaponBranch = "any" }
+            local b7_tl = SimFight:ResolveCanonicalBranch(npc7_tl)
+            local mutatedBranch7_tl = npc7_tl.weaponBranch
+            -- 8. weaponBranch == "any" with deterministic gear metadata -> "kiem"
+            local b8 = SimFight:ResolveCanonicalBranch({ faction = "vodang", weaponBranch = "any", nNewWeaponType = 20 })
+            -- 9. weaponBranch == "any" with deterministic canonical skill metadata -> "chuong"
+            local b9 = SimFight:ResolveCanonicalBranch({ faction = "vodang", weaponBranch = "any", skillCastBua = { 365, 20 } })
+            -- 10. weaponBranch == "any" with deterministic template skill metadata -> "chuong"
+            local b10 = SimFight:ResolveCanonicalBranch({ faction = "vodang", weaponBranch = "any", nNpcId = 2020 })
+
+            return b1, b2, b3, b4, b5, mutatedBranch5, b6, mutatedBranch6, b7_vd, mutatedBranch7_vd, b7_tl, mutatedBranch7_tl, b8, b9, b10
         end
         """
         self.lua.execute(test_script)
-        b1, b2, b3, b4, b5, mutated5 = self.lua.globals()["evalBranchResolution"]()
+        res = self.lua.globals()["evalBranchResolution"]()
+        b1, b2, b3, b4, b5, mut5, b6, mut6, b7_vd, mut7_vd, b7_tl, mut7_tl, b8, b9, b10 = res
         self.assertEqual(b1, "dao")
         self.assertEqual(b2, "quyen")
         self.assertEqual(b3, "kiem")
         self.assertEqual(b4, "thuong")
         self.assertIsNone(b5)
-        self.assertIsNone(mutated5)
+        self.assertIsNone(mut5)
+        # Regression: unknown_branch -> nil without mutating
+        self.assertIsNone(b6)
+        self.assertEqual(mut6, "unknown_branch")
+        # No arbitrary selection for "any": returns None and does not mutate
+        self.assertIsNone(b7_vd)
+        self.assertEqual(mut7_vd, "any")
+        self.assertIsNone(b7_tl)
+        self.assertEqual(mut7_tl, "any")
+        # Deterministic derivation for "any" with gear/skill/template
+        self.assertEqual(b8, "kiem")
+        self.assertEqual(b9, "chuong")
+        self.assertEqual(b10, "chuong")
 
 
 if __name__ == "__main__":

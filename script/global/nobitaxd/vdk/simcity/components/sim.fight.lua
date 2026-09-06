@@ -53,34 +53,78 @@ function SimFight:ResolveCanonicalBranch(tbNpc, fac)
         facTable = SimProgression.FACTION_SKILLS[facName]
     end
 
-    -- 1. Use canonical branch already assigned to bot
+    -- 1. Use canonical branch already assigned to bot (if valid and not "any")
     local b = tbNpc.weaponBranch
-    if b and b ~= "" then
-        if not facTable or facTable[b] then
+    if b and b ~= "" and b ~= "any" then
+        if not facTable then
+            return b
+        end
+        if facTable[b] then
             return b
         end
         -- Canonical branch alias mapping
+        local mapped = nil
         if b == "taykhong" then
-            if facTable["quyen"] then return "quyen" end
-            if facTable["amkhi"] then return "amkhi" end
-            if facTable["chuong"] then return "chuong" end
+            if facTable["taykhong"] then mapped = "taykhong"
+            elseif facTable["quyen"] then mapped = "quyen"
+            elseif facTable["amkhi"] then mapped = "amkhi"
+            elseif facTable["chuong"] then mapped = "chuong" end
         elseif b == "con" and facTable["bong"] then
-            return "bong"
+            mapped = "bong"
         elseif b == "bong" and facTable["con"] then
-            return "con"
-        elseif b == "any" then
-            if facTable["chuong"] then return "chuong" end
-            if facTable["kiem"] then return "kiem" end
-            if facTable["dao"] then return "dao" end
+            mapped = "con"
+        elseif b == "dao" and facTable["phi_dao"] and facName == "duongmon" then
+            mapped = "phi_dao"
+        elseif (b == "khi" or b == "phap") and facName == "vodang" and facTable["chuong"] then
+            mapped = "chuong"
         end
-        return b
+        if mapped then return mapped end
+        -- facTable exists and b is neither in facTable nor a recognized alias
+        return nil
     end
 
-    -- 2. Derive deterministically from existing canonical gear metadata (tbNpc.nNewWeaponType)
+    -- 2. Derive deterministically from existing canonical skill metadata on tbNpc
+    local skillId = nil
+    if tbNpc.skillCastBua then
+        if type(tbNpc.skillCastBua) == "table" then
+            skillId = tbNpc.skillCastBua[1]
+        elseif type(tbNpc.skillCastBua) == "number" then
+            skillId = tbNpc.skillCastBua
+        end
+    elseif tbNpc.skillCastBuaNoDebuff then
+        if type(tbNpc.skillCastBuaNoDebuff) == "table" then
+            skillId = tbNpc.skillCastBuaNoDebuff[1]
+        elseif type(tbNpc.skillCastBuaNoDebuff) == "number" then
+            skillId = tbNpc.skillCastBuaNoDebuff
+        end
+    end
+    if skillId and skillId ~= 53 and facTable then
+        local matchedBranch = nil
+        local matchCount = 0
+        for bName, skillList in facTable do
+            if type(skillList) == "table" then
+                for i = 1, getn(skillList) do
+                    if skillList[i] and skillList[i].id == skillId then
+                        matchedBranch = bName
+                        matchCount = matchCount + 1
+                        break
+                    end
+                end
+            end
+        end
+        if matchCount == 1 then
+            return matchedBranch
+        end
+    end
+
+    -- 3. Derive deterministically from existing canonical gear metadata (tbNpc.nNewWeaponType)
     local wType = tbNpc.nNewWeaponType
     if wType ~= nil then
         if wType == 20 and (not facTable or facTable["kiem"]) then return "kiem" end
-        if wType == 23 and (not facTable or facTable["dao"]) then return "dao" end
+        if wType == 23 then
+            if not facTable or facTable["dao"] then return "dao"
+            elseif facTable["phi_dao"] and facName == "duongmon" then return "phi_dao" end
+        end
         if wType == 24 and (not facTable or facTable["thuong"]) then return "thuong" end
         if wType == 26 then
             if not facTable or facTable["con"] then return "con"
@@ -88,20 +132,28 @@ function SimFight:ResolveCanonicalBranch(tbNpc, fac)
         end
         if wType == 28 and (not facTable or facTable["songdao"]) then return "songdao" end
         if wType == 30 and (not facTable or facTable["chuy"]) then return "chuy" end
-        if wType == 0 then
-            if not facTable or facTable["quyen"] then return "quyen"
-            elseif facTable["amkhi"] then return "amkhi"
-            elseif facTable["chuong"] then return "chuong" end
+        if wType == 0 and facTable then
+            if facTable["taykhong"] then return "taykhong"
+            elseif facTable["quyen"] then return "quyen"
+            elseif facName == "caibang" and facTable["chuong"] then return "chuong"
+            elseif facName == "ngudoc" and facTable["chuong"] then return "chuong"
+            elseif facName == "duongmon" and facTable["amkhi"] then return "amkhi"
+            elseif facName == "ngami" and facTable["chuong"] then return "chuong"
+            elseif facName == "vodang" and facTable["chuong"] then return "chuong"
+            elseif facName == "thiennhan" and facTable["chuong"] then return "chuong"
+            end
         end
     end
 
-    -- 3. Derive deterministically from existing canonical NPC template metadata
+    -- 4. Derive deterministically from existing canonical NPC template metadata (SimBotNpc)
     if SimBotNpc and tbNpc.nNpcId and SimBotNpc[tbNpc.nNpcId] then
         local t = SimBotNpc[tbNpc.nNpcId]
+        local tSkillId = t[1]
         local tb = t[2]
-        if tb then
+        if tb and tb ~= "" and tb ~= "any" then
             if not facTable or facTable[tb] then return tb end
             if tb == "taykhong" then
+                if facTable["taykhong"] then return "taykhong" end
                 if facTable["quyen"] then return "quyen" end
                 if facTable["amkhi"] then return "amkhi" end
                 if facTable["chuong"] then return "chuong" end
@@ -109,15 +161,34 @@ function SimFight:ResolveCanonicalBranch(tbNpc, fac)
                 return "bong"
             elseif tb == "bong" and facTable["con"] then
                 return "con"
-            elseif tb == "any" then
-                if facTable["chuong"] then return "chuong" end
-                if facTable["kiem"] then return "kiem" end
-                if facTable["dao"] then return "dao" end
+            elseif tb == "dao" and facTable["phi_dao"] and facName == "duongmon" then
+                return "phi_dao"
+            elseif (tb == "khi" or tb == "phap") and facName == "vodang" and facTable["chuong"] then
+                return "chuong"
             end
-            return tb
+        end
+        -- If template branch was "any" or unmapped, check template's canonical skill id (t[1])
+        if tSkillId and tSkillId ~= 53 and facTable then
+            local matchedBranch = nil
+            local matchCount = 0
+            for bName, skillList in facTable do
+                if type(skillList) == "table" then
+                    for i = 1, getn(skillList) do
+                        if skillList[i] and skillList[i].id == tSkillId then
+                            matchedBranch = bName
+                            matchCount = matchCount + 1
+                            break
+                        end
+                    end
+                end
+            end
+            if matchCount == 1 then
+                return matchedBranch
+            end
         end
     end
 
+    -- Never choose an arbitrary branch or iterate facTable blindly
     return nil
 end
 

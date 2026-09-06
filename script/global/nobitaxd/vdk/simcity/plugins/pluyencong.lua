@@ -307,10 +307,24 @@ function SimCityLuyenCong:hibernateMap(mapId)
                     personality = bot.personality or "balanced"
                 }
                 -- Check for pending migration to next map tier if bot outleveled current map
-                if curMapConfig and botData.level > curMapConfig.maxLv and mapIdx < getn(self.TRAIN_MAPS) then
-                    local nextMapId = self.TRAIN_MAPS[mapIdx + 1].mapId
-                    if not migratedBots[nextMapId] then migratedBots[nextMapId] = {} end
-                    tinsert(migratedBots[nextMapId], botData)
+                if curMapConfig and botData.level > curMapConfig.maxLv then
+                    local targetMapId = nil
+                    for ti = 1, getn(self.TRAIN_MAPS) do
+                        local tm = self.TRAIN_MAPS[ti]
+                        if botData.level >= tm.minLv and botData.level <= tm.maxLv then
+                            targetMapId = tm.mapId
+                            break
+                        end
+                    end
+                    if not targetMapId and mapIdx and mapIdx < getn(self.TRAIN_MAPS) then
+                        targetMapId = self.TRAIN_MAPS[mapIdx + 1].mapId
+                    end
+                    if targetMapId then
+                        if not migratedBots[targetMapId] then migratedBots[targetMapId] = {} end
+                        tinsert(migratedBots[targetMapId], botData)
+                    else
+                        tinsert(rosterToSave, botData)
+                    end
                 else
                     tinsert(rosterToSave, botData)
                 end

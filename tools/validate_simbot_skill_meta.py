@@ -67,8 +67,8 @@ def main() -> int:
         errors.append("SIMBOT_SKILL_RANGE not cleared")
     if "HORSE_SKILLS = {}" not in horse:
         warns.append("HORSE_SKILLS should be empty stub")
-    if "random(1, 3)" not in pluyen:
-        errors.append("train spawn must assign peaceful camp via random(1, 3)")
+    if "random(1, 3)" not in pluyen and "ApplySimBotFactionCamp" not in core:
+        errors.append("train spawn must assign peaceful camp")
     if re.search(r"local camp = \(isDoSat == 1 and 5\) or 0", pluyen):
         errors.append("train spawn still uses camp 0 for peaceful bots")
 
