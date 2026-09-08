@@ -1,6 +1,4 @@
-/*
-    Public functions
-*/
+-- Public functions
 
 function execCreateChar(self, simInstance, tbNpc, isNew, goX32, goY32)
     local nListId = tbNpc.id
@@ -51,9 +49,11 @@ function execCreateChar(self, simInstance, tbNpc, isNew, goX32, goY32)
         end
 
         local name = tbNpc.szName
-        if (not name) or name == "" or name == " " then
-            name = (tbNpc.ngoaitrang == 1 and SimCityNPCInfo:generateName()) or SimCityNPCInfo:getName(tbNpc.nNpcId)
-            if (not name) or name == "" then name = SimCityNPCInfo:generateName() end
+        if (not name) or name == "" or name == " " or (strfind and strfind(name, "Temple")) then
+            name = (tbNpc.ngoaitrang == 1 or tbNpc.mode == "train") and SimCityNPCInfo:generateName() or SimCityNPCInfo:getName(tbNpc.nNpcId)
+            if (not name) or name == "" or (strfind and strfind(name, "Temple")) then
+                name = SimCityNPCInfo:generateName()
+            end
         end
 
         if (tbNpc.tongkim == 1) then
@@ -160,7 +160,12 @@ function execCreateChar(self, simInstance, tbNpc, isNew, goX32, goY32)
                 if tbNpc.isFighting == 1 then
                     SetNpcKind(nNpcIndex, 0)
                 else
-                    SetNpcKind(nNpcIndex, tbNpc.kind or 0)
+                    -- Train/TK combat bots stay kind=0 (player-attackable); others may use configured kind
+                    if tbNpc.mode == "train" or tbNpc.tongkim == 1 or tbNpc.isAttackable == 1 then
+                        SetNpcKind(nNpcIndex, 0)
+                    else
+                        SetNpcKind(nNpcIndex, tbNpc.kind or 0)
+                    end
                 end
               
                 if (tbNpc.isFighting == 0) then

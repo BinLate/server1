@@ -5,7 +5,7 @@
 
 IncludeLib("NPCINFO")
 IncludeLib("SETTING")
-Include("\script\global\nobitaxd\vdk\simcity\components\sim.progression.lua")
+Include("\\script\\global\\nobitaxd\\vdk\\simcity\\components\\sim.progression.lua")
 
 SimCityNgoaiTrang = {
 	ALLTRANGBI_DATA = {

@@ -43,6 +43,155 @@ function SimFight:IsRangedFaction(faction, weaponBranch)
     return 0
 end
 
+function SimFight:ResolveCanonicalBranch(tbNpc, fac)
+    if not tbNpc then return nil end
+    local facName = fac or tbNpc.faction
+    if not facName then return nil end
+
+    local facTable = nil
+    if SimProgression and SimProgression.FACTION_SKILLS then
+        facTable = SimProgression.FACTION_SKILLS[facName]
+    end
+
+    -- 1. Use canonical branch already assigned to bot (if valid and not "any")
+    local b = tbNpc.weaponBranch
+    if b and b ~= "" and b ~= "any" then
+        if not facTable then
+            return b
+        end
+        if facTable[b] then
+            return b
+        end
+        -- Canonical branch alias mapping
+        local mapped = nil
+        if b == "taykhong" then
+            if facTable["taykhong"] then mapped = "taykhong"
+            elseif facTable["quyen"] then mapped = "quyen"
+            elseif facTable["amkhi"] then mapped = "amkhi"
+            elseif facTable["chuong"] then mapped = "chuong" end
+        elseif b == "con" and facTable["bong"] then
+            mapped = "bong"
+        elseif b == "bong" and facTable["con"] then
+            mapped = "con"
+        elseif b == "dao" and facTable["phi_dao"] and facName == "duongmon" then
+            mapped = "phi_dao"
+        elseif (b == "khi" or b == "phap") and facName == "vodang" and facTable["chuong"] then
+            mapped = "chuong"
+        end
+        if mapped then return mapped end
+        -- facTable exists and b is neither in facTable nor a recognized alias
+        return nil
+    end
+
+    -- 2. Derive deterministically from existing canonical skill metadata on tbNpc
+    local skillId = nil
+    if tbNpc.skillCastBua then
+        if type(tbNpc.skillCastBua) == "table" then
+            skillId = tbNpc.skillCastBua[1]
+        elseif type(tbNpc.skillCastBua) == "number" then
+            skillId = tbNpc.skillCastBua
+        end
+    elseif tbNpc.skillCastBuaNoDebuff then
+        if type(tbNpc.skillCastBuaNoDebuff) == "table" then
+            skillId = tbNpc.skillCastBuaNoDebuff[1]
+        elseif type(tbNpc.skillCastBuaNoDebuff) == "number" then
+            skillId = tbNpc.skillCastBuaNoDebuff
+        end
+    end
+    if skillId and skillId ~= 53 and facTable then
+        local matchedBranch = nil
+        local matchCount = 0
+        for bName, skillList in facTable do
+            if type(skillList) == "table" then
+                for i = 1, getn(skillList) do
+                    if skillList[i] and skillList[i].id == skillId then
+                        matchedBranch = bName
+                        matchCount = matchCount + 1
+                        break
+                    end
+                end
+            end
+        end
+        if matchCount == 1 then
+            return matchedBranch
+        end
+    end
+
+    -- 3. Derive deterministically from existing canonical gear metadata (tbNpc.nNewWeaponType)
+    local wType = tbNpc.nNewWeaponType
+    if wType ~= nil then
+        if wType == 20 and (not facTable or facTable["kiem"]) then return "kiem" end
+        if wType == 23 then
+            if not facTable or facTable["dao"] then return "dao"
+            elseif facTable["phi_dao"] and facName == "duongmon" then return "phi_dao" end
+        end
+        if wType == 24 and (not facTable or facTable["thuong"]) then return "thuong" end
+        if wType == 26 then
+            if not facTable or facTable["con"] then return "con"
+            elseif facTable["bong"] then return "bong" end
+        end
+        if wType == 28 and (not facTable or facTable["songdao"]) then return "songdao" end
+        if wType == 30 and (not facTable or facTable["chuy"]) then return "chuy" end
+        if wType == 0 and facTable then
+            if facTable["taykhong"] then return "taykhong"
+            elseif facTable["quyen"] then return "quyen"
+            elseif facName == "caibang" and facTable["chuong"] then return "chuong"
+            elseif facName == "ngudoc" and facTable["chuong"] then return "chuong"
+            elseif facName == "duongmon" and facTable["amkhi"] then return "amkhi"
+            elseif facName == "ngami" and facTable["chuong"] then return "chuong"
+            elseif facName == "vodang" and facTable["chuong"] then return "chuong"
+            elseif facName == "thiennhan" and facTable["chuong"] then return "chuong"
+            end
+        end
+    end
+
+    -- 4. Derive deterministically from existing canonical NPC template metadata (SimBotNpc)
+    if SimBotNpc and tbNpc.nNpcId and SimBotNpc[tbNpc.nNpcId] then
+        local t = SimBotNpc[tbNpc.nNpcId]
+        local tSkillId = t[1]
+        local tb = t[2]
+        if tb and tb ~= "" and tb ~= "any" then
+            if not facTable or facTable[tb] then return tb end
+            if tb == "taykhong" then
+                if facTable["taykhong"] then return "taykhong" end
+                if facTable["quyen"] then return "quyen" end
+                if facTable["amkhi"] then return "amkhi" end
+                if facTable["chuong"] then return "chuong" end
+            elseif tb == "con" and facTable["bong"] then
+                return "bong"
+            elseif tb == "bong" and facTable["con"] then
+                return "con"
+            elseif tb == "dao" and facTable["phi_dao"] and facName == "duongmon" then
+                return "phi_dao"
+            elseif (tb == "khi" or tb == "phap") and facName == "vodang" and facTable["chuong"] then
+                return "chuong"
+            end
+        end
+        -- If template branch was "any" or unmapped, check template's canonical skill id (t[1])
+        if tSkillId and tSkillId ~= 53 and facTable then
+            local matchedBranch = nil
+            local matchCount = 0
+            for bName, skillList in facTable do
+                if type(skillList) == "table" then
+                    for i = 1, getn(skillList) do
+                        if skillList[i] and skillList[i].id == tSkillId then
+                            matchedBranch = bName
+                            matchCount = matchCount + 1
+                            break
+                        end
+                    end
+                end
+            end
+            if matchCount == 1 then
+                return matchedBranch
+            end
+        end
+    end
+
+    -- Never choose an arbitrary branch or iterate facTable blindly
+    return nil
+end
+
 function SimFight:CalculateKiteTile(myTileX, myTileY, enemyTileX, enemyTileY, kiteDist)
     kiteDist = kiteDist or 6
     local dx = myTileX - enemyTileX
@@ -69,10 +218,10 @@ function SimFight:SelectBestTarget(simInstance, tbNpc, fightSys)
     local foundPlayerEnemy = tbNpc.isPlayerEnemyAround
     if foundPlayerEnemy and foundPlayerEnemy > 0 then
         local pW, pTileX, pTileY = CallPlayerFunction(foundPlayerEnemy, GetWorldPos)
-        if pW and pTileX and pTileY and pW == myW then
+        local pNpcIdx = PIdx2NpcIdx and PIdx2NpcIdx(foundPlayerEnemy)
+        local curLife = (pNpcIdx and NPCINFO_GetNpcCurrentLife and NPCINFO_GetNpcCurrentLife(pNpcIdx)) or 1000
+        if pW and pTileX and pTileY and pW == myW and curLife > 0 then
             local dist = GetDistanceRadius(myTileX, myTileY, pTileX, pTileY)
-            local pNpcIdx = PIdx2NpcIdx and PIdx2NpcIdx(foundPlayerEnemy)
-            local curLife = (pNpcIdx and NPCINFO_GetNpcCurrentLife and NPCINFO_GetNpcCurrentLife(pNpcIdx)) or 1000
             local maxLife = (pNpcIdx and NPCINFO_GetNpcCurrentMaxLife and NPCINFO_GetNpcCurrentMaxLife(pNpcIdx)) or 1000
             return {
                 targetType = "player",
@@ -93,10 +242,26 @@ function SimFight:SelectBestTarget(simInstance, tbNpc, fightSys)
 
     -- 2. Check NPC enemies around (support direct fightSys passed or tbNpc.foundNpcEnemy)
     local foundNpcEnemy = tbNpc.foundNpcEnemy
+    if foundNpcEnemy and foundNpcEnemy > 0 then
+        local targetX32, targetY32, targetW = GetNpcPos(foundNpcEnemy)
+        local curLife = 1000
+        if NPCINFO_GetNpcCurrentLife then
+            local l = NPCINFO_GetNpcCurrentLife(foundNpcEnemy)
+            if l ~= nil then curLife = l end
+        end
+        if not (targetX32 and targetY32 and targetW == myW and curLife > 0) then
+            tbNpc.foundNpcEnemy = nil
+            foundNpcEnemy = nil
+        end
+    end
+
     if not foundNpcEnemy or foundNpcEnemy <= 0 then
         local isNpcAround = (fightSys and fightSys.IsNpcEnemyAround) or (self and self.IsNpcEnemyAround) or (tbNpc.fightSys and tbNpc.fightSys.IsNpcEnemyAround) or (SimFight and SimFight.Citizen and SimFight.Citizen.IsNpcEnemyAround)
         if isNpcAround then
             foundNpcEnemy = isNpcAround(fightSys or self or tbNpc.fightSys or SimFight.Citizen, simInstance, tbNpc)
+            if foundNpcEnemy and foundNpcEnemy > 0 then
+                tbNpc.foundNpcEnemy = foundNpcEnemy
+            end
         end
     end
 
@@ -141,22 +306,25 @@ function SimApplyHorseCombat(tbNpc, skillId)
     end
 
     local canHorse = 0
-    if SimProgression and SimProgression.CanCastOnHorse then
+    if SimSkillMeta and SimSkillMeta.CanCastOnHorse then
+        canHorse = SimSkillMeta:CanCastOnHorse(skillId)
+    elseif SimProgression and SimProgression.CanCastOnHorse then
         canHorse = SimProgression:CanCastOnHorse(skillId)
     end
 
     if canHorse == 0 then
-        -- Skill bo chien: Xuong ngua
-        if SetNpcRideHorse and tbNpc.isCurrentlyRiding ~= 0 then
-            SetNpcRideHorse(tbNpc.finalIndex, 0)
-        end
+        -- HorseLimit>=1: MUST dismount BEFORE cast
+        if SetNpcRideHorse then SetNpcRideHorse(tbNpc.finalIndex, 0) end
+        if BotMountSync then BotMountSync(tbNpc.finalIndex, 0) end
         tbNpc.isCurrentlyRiding = 0
+        tbNpc.lastRideWant = 0
     else
-        -- Skill ky chien: Len ngua
+        -- HorseLimit==0: may remain mounted
         if SetNpcRideHorse and tbNpc.isCurrentlyRiding ~= 1 then
             SetNpcRideHorse(tbNpc.finalIndex, 1)
         end
         tbNpc.isCurrentlyRiding = 1
+        tbNpc.lastRideWant = 1
     end
 end
 
@@ -207,6 +375,16 @@ function LeaveFight(self, simInstance, tbNpc, isAllDead, reason)
         random(tbNpc.TIME_RESTING_minTs or TIME_RESTING.minTs,
             tbNpc.TIME_RESTING_maxTs or TIME_RESTING.maxTs)
     reason = reason or "no reason" 
+    if SIMBOT_COMBAT_DEBUG == 1 and Msg2Player and simInstance then
+        local pId = simInstance.GetPlayer and simInstance:GetPlayer(nListId)
+        if pId and pId > 0 then
+            Msg2Player(format("[SIMBOT_COMBAT_DEBUG] LeaveFight bot=%s mode=%s isAllDead=%s reason=%s",
+                tostring(tbNpc.szName or tbNpc.finalIndex),
+                tostring(tbNpc.mode),
+                tostring(isAllDead or 0),
+                tostring(reason or "none")))
+        end
+    end
     if (isAllDead ~= 1 and tbNpc.kind ~= 3 and (tbNpc.kind ~= 4 or tbNpc.isAttackable == 1)) then        
         self:SetFightState(tbNpc, 0)
     else
@@ -217,20 +395,24 @@ end
 
 function execCastNormalSkill(self, simInstance, tbNpc)
     if not tbNpc or not tbNpc.finalIndex or tbNpc.finalIndex <= 0 then return end
-    if not tbNpc.faction or not SimCityPhai[tbNpc.faction] then
+    if not tbNpc.faction and not tbNpc.skillCastBua then
         return
     end
 
-    if tbNpc.fighting == 0 or (tbNpc.tick_canCast and tbNpc.tick_canCast > tbNpc.tick_breath) then
+    if tbNpc.fighting == 0 and tbNpc.isFighting ~= 1 then
+        return
+    end
+    if (tbNpc.tick_canCast and tbNpc.tick_canCast > tbNpc.tick_breath) then
         return
     end
 
-    local skillCount = getn(SimCityPhai[tbNpc.faction].normalCast)
-    if skillCount == 0 and not tbNpc.skillCastBua then
+    local hasPhaiCast = (SimCityPhai and tbNpc.faction and SimCityPhai[tbNpc.faction] and SimCityPhai[tbNpc.faction].normalCast and getn(SimCityPhai[tbNpc.faction].normalCast) > 0)
+    local hasProg = (SimProgression and tbNpc.faction and ((SimProgression.UpdateBotSkills ~= nil) or (SimProgression.FACTION_SKILLS and SimProgression.FACTION_SKILLS[tbNpc.faction])))
+    if not hasPhaiCast and not tbNpc.skillCastBua and not hasProg and not SimPickSkill then
         return
     end
 
-    if tbNpc.isPlayerEnemyAround == 0 and (random(1, 1000) > 50) then
+    if tbNpc.isPlayerEnemyAround == 0 and tbNpc.mode ~= "train" and (random(1, 1000) > 50) then
         return
     end
 
@@ -257,8 +439,47 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         SimParty:ShareAggroTarget(simInstance, tbNpc.virtualPartyId, target.npcIndex, tbNpc)
     end
 
-    local selectedSkill = SimPickSkill(tbNpc)
-    if not selectedSkill or not selectedSkill[1] then return end
+    local selectedSkill = (SimPickSkill and SimPickSkill(tbNpc)) or tbNpc.skillCastBua or (tbNpc.faction and SimCityPhai and SimCityPhai[tbNpc.faction] and SimCityPhai[tbNpc.faction].normalCast and SimCityPhai[tbNpc.faction].normalCast[1])
+    if not selectedSkill and tbNpc.faction then
+        local canonicalBranch = SimFight:ResolveCanonicalBranch(tbNpc, tbNpc.faction)
+        if canonicalBranch then
+            tbNpc.weaponBranch = canonicalBranch
+            if SimProgression and SimProgression.UpdateBotSkills then
+                SimProgression:UpdateBotSkills(tbNpc)
+                selectedSkill = tbNpc.skillCastBua
+            end
+            if not selectedSkill and SimProgression and SimProgression.FACTION_SKILLS and SimProgression.FACTION_SKILLS[tbNpc.faction] then
+                local facTable = SimProgression.FACTION_SKILLS[tbNpc.faction]
+                local skillList = facTable[canonicalBranch]
+                if skillList and getn(skillList) > 0 then
+                    local lv = tbNpc.level or 1
+                    local chosenEntry = nil
+                    if lv >= 10 then
+                        for i = 1, getn(skillList) do
+                            local entry = skillList[i]
+                            if lv >= (entry.reqLv or 1) then
+                                chosenEntry = entry
+                                break
+                            end
+                        end
+                    end
+                    if not chosenEntry then
+                        chosenEntry = skillList[getn(skillList)]
+                    end
+                    if chosenEntry and chosenEntry.id then
+                        local skLv = (SimProgression.CalcSkillLevel and SimProgression:CalcSkillLevel(lv, chosenEntry.reqLv or 1)) or 20
+                        selectedSkill = { chosenEntry.id, skLv }
+                    end
+                end
+            end
+        end
+    end
+    if not selectedSkill or not selectedSkill[1] then
+        if SimLog then
+            SimLog("[SimFight] execCastNormalSkill resolution failed for bot: " .. tostring(tbNpc.szName or tbNpc.finalIndex or tbNpc.id) .. " fac=" .. tostring(tbNpc.faction) .. " branch=" .. tostring(tbNpc.weaponBranch))
+        end
+        return
+    end
     local skillId = selectedSkill[1]
     local baseSkillLv = selectedSkill[2] or 20
     local bonusSkillLv = (SimGear and SimGear.GetSkillLevelBonus and SimGear:GetSkillLevelBonus(tbNpc)) or 0
@@ -271,8 +492,18 @@ function execCastNormalSkill(self, simInstance, tbNpc)
     local myTileY = floor(myY32 / 32)
 
     local maxCastTiles = 2
-    if SimProgression and SimProgression.GetSkillAttackRadiusTiles then
-        maxCastTiles = SimProgression:GetSkillAttackRadiusTiles(skillId)
+    local combatMeta = nil
+    if SimSkillMeta and SimSkillMeta.GetSkillCombatMeta then
+        combatMeta = SimSkillMeta:GetSkillCombatMeta(skillId)
+    end
+    if combatMeta and combatMeta.attackRadiusTiles then
+        maxCastTiles = combatMeta.attackRadiusTiles
+    elseif SimSkillMeta and SimSkillMeta.GetAttackRadiusTiles then
+        local t = SimSkillMeta:GetAttackRadiusTiles(skillId)
+        if t then maxCastTiles = t end
+    elseif SimProgression and SimProgression.GetSkillAttackRadiusTiles then
+        local t = SimProgression:GetSkillAttackRadiusTiles(skillId)
+        if t then maxCastTiles = t end
     end
     local maxChaseTiles = SIMBOT_CHASE_MAX_TILES or 20
 
@@ -286,7 +517,39 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         return
     end
 
-    local isRanged = SimFight:IsRangedFaction(tbNpc.faction, tbNpc.weaponBranch)
+    -- Range class from THIS skill only (never faction-wide assumption)
+    local isRanged = 0
+    local classified = 0
+    if combatMeta and combatMeta.skillType then
+        if combatMeta.skillType == "ranged" then
+            isRanged = 1
+            classified = 1
+        elseif combatMeta.skillType == "melee" then
+            isRanged = 0
+            classified = 1
+        end
+    end
+
+    if classified == 0 and SimSkillMeta and SimSkillMeta.Get then
+        local meta = SimSkillMeta:Get(skillId)
+        if meta then
+            if meta.melee == 1 then
+                isRanged = 0
+                classified = 1
+            elseif (meta.tiles or 0) >= 6 or meta.typ == 0 then
+                isRanged = 1
+                classified = 1
+            else
+                isRanged = 0
+                classified = 1
+            end
+        end
+    end
+
+    if classified == 0 and SimFight and SimFight.IsRangedFaction and tbNpc.faction then
+        isRanged = SimFight:IsRangedFaction(tbNpc.faction, tbNpc.weaponBranch)
+        classified = 1
+    end
 
     -- Tactical kiting: If ranged bot and target is closer than 4 tiles
     if isRanged == 1 and target.dist < 4 and tbNpc.tongkim ~= 1 then
@@ -307,10 +570,23 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         return
     end
 
-    -- Cast skill combo
+    -- Cast skill combo: horse state then SAME pending skill
     SimFight:SetCombatState(tbNpc, SIM_COMBAT_STATE.COMBO, "casting combo")
     if SimMovement then SimMovement:SetState(tbNpc, SIM_MOVE_STATE.IDLE, "casting combo stationary") end
     SimApplyHorseCombat(tbNpc, skillId)
+    -- If skill forbids horse and we are still mounted, defer cast 1 tick
+    if SimSkillMeta and SimSkillMeta.CanCastOnHorse and SimSkillMeta:CanCastOnHorse(skillId) ~= 1 then
+        local stillRide = 0
+        if GetNpcRideHorse then stillRide = GetNpcRideHorse(tbNpc.finalIndex) or 0 end
+        if stillRide == 1 or tbNpc.isCurrentlyRiding == 1 then
+            if SetNpcRideHorse then SetNpcRideHorse(tbNpc.finalIndex, 0) end
+            if BotMountSync then BotMountSync(tbNpc.finalIndex, 0) end
+            tbNpc.isCurrentlyRiding = 0
+            tbNpc.lastRideWant = 0
+            tbNpc.tick_canCast = tbNpc.tick_breath + 1
+            return
+        end
+    end
 
     if target.targetType == "player" then
         if BotDoSkill and target.npcIndex and target.npcIndex > 0 then
@@ -318,15 +594,31 @@ function execCastNormalSkill(self, simInstance, tbNpc)
         else
             NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, target.worldX, target.worldY)
         end
+        if SimCommitSkillToggle then SimCommitSkillToggle(tbNpc) end
         local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
+        -- Train: cast faction skills more often so Client shows VFX (engine AI alone often auto-attacks)
+        if tbNpc.mode == "train" then
+            local trainCd = TRAIN_SKILL_CAST_CD_TICKS or 1
+            if trainCd < cdTicks then cdTicks = trainCd end
+        end
         tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
         if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, target.targetId, "player") end
         if SimProgression and SimProgression.AddExp and tbNpc.mode == "train" then
             SimProgression:AddExp(tbNpc, (tbNpc.level or 1) * 20)
         end
     else
-        NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, target.worldX, target.worldY)
+        -- Prefer BotDoSkill(targetIndex) so Client plays skill anim/VFX; fallback NpcCastSkill
+        if BotDoSkill and target.npcIndex and target.npcIndex > 0 then
+            BotDoSkill(tbNpc.finalIndex, skillId, skillLevel, target.npcIndex)
+        else
+            NpcCastSkill(tbNpc.finalIndex, skillId, skillLevel, target.worldX, target.worldY)
+        end
+        if SimCommitSkillToggle then SimCommitSkillToggle(tbNpc) end
         local cdTicks = (SimGear and SimGear.GetCastCooldownTicks and SimGear:GetCastCooldownTicks(tbNpc)) or (2*18/REFRESH_RATE)
+        if tbNpc.mode == "train" then
+            local trainCd = TRAIN_SKILL_CAST_CD_TICKS or 1
+            if trainCd < cdTicks then cdTicks = trainCd end
+        end
         tbNpc.tick_canCast = tbNpc.tick_breath + cdTicks
         if SimGear and SimGear.ApplyCombatLeech then SimGear:ApplyCombatLeech(tbNpc, target.targetId, "npc") end
         if SimProgression and SimProgression.AddExp and tbNpc.mode == "train" then
@@ -480,9 +772,7 @@ function BuffChar(self, simInstance, tbNpc)
         BotDoSkill(tbNpc.finalIndex, 178, 20, 0)
     end
 end
-/*
-    Public functions
-*/
+-- Public functions
 SimFight = SimFight or {}
 
 SimFight.Base = {
@@ -494,10 +784,14 @@ SimFight.Citizen = {
     execCastOnParent = execCastOnParent,
     execCastOnSelf = execCastOnSelf,    
     TriggerFightWithNPC = function(self, simInstance, tbNpc)       
-        if tbNpc.isPlayerFighting == 0 and tbNpc.mode ~= "train" and tbNpc.tongkim ~= 1 then   
+        -- Allow train / tongkim / outdoor grind / player-fighting
+        local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+        if tbNpc.isPlayerFighting == 0 and tbNpc.mode ~= "train" and tbNpc.tongkim ~= 1 and not outdoorOk then   
             return 0
         end
-        if (self:IsNpcEnemyAround(simInstance, tbNpc) > 0) then
+        local enemy = self:IsNpcEnemyAround(simInstance, tbNpc)
+        if enemy and enemy > 0 then
+            tbNpc.foundNpcEnemy = enemy
             return self:JoinFight(simInstance, tbNpc, "enemy around")
         end
         return 0
@@ -505,19 +799,56 @@ SimFight.Citizen = {
     IsNpcEnemyAround = function(self, simInstance, tbNpc)
         local allNpcs = {}
         local nCount = 0
+        local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+        local grind = (tbNpc.mode == "train" or outdoorOk)
         local radius = tbNpc.RADIUS_FIGHT_SCAN or RADIUS_FIGHT_SCAN
+        if grind then
+            radius = tbNpc.RADIUS_FIGHT_SCAN or 20
+        end
 
-        -- Thanh thi / tong kim / chien loan
         allNpcs, nCount = GetNpcAroundNpcList(tbNpc.finalIndex, radius)
+        if not allNpcs or not nCount or nCount <= 0 then return 0 end
+
+        local bestMonster = 0
+        local bestKind0 = 0
         for i = 1, nCount do
-            if allNpcs[i] ~= tbNpc.finalIndex then
-                local fighter2Kind = GetNpcKind(allNpcs[i])
-                local fighter2Camp = GetNpcCurCamp(allNpcs[i])
-                if fighter2Kind == 0 and ((tbNpc.mode == "train" and GetNpcParam(allNpcs[i], 4) ~= 1) or (IsAttackableCamp(tbNpc.camp, fighter2Camp) == 1)) then  
-                    return allNpcs[i]
+            local idx = allNpcs[i]
+            if idx and idx ~= tbNpc.finalIndex then
+                local isSim = GetNpcParam and (GetNpcParam(idx, 4) == 1)
+                if not isSim then
+                    local fighter2Kind = GetNpcKind(idx)
+                    local fighter2Camp = GetNpcCurCamp(idx)
+                    local alive = 1
+                    if NPCINFO_GetNpcCurrentLife then
+                        local life = NPCINFO_GetNpcCurrentLife(idx)
+                        if life ~= nil and life <= 0 then alive = 0 end
+                    end
+                    if alive == 1 then
+                        if grind then
+                            -- Prefer real monsters (kind ~= 0)
+                            if fighter2Kind ~= nil and fighter2Kind ~= 0 then
+                                if bestMonster == 0 then bestMonster = idx end
+                            elseif fighter2Kind == 0 then
+                                -- Only allow kind-0 player/PvP targets through explicit DoSat/hostile-PvP rules
+                                local isHostileKind0 = 0
+                                if tbNpc.isDoSat == 1 or tbNpc.camp == 5 then
+                                    isHostileKind0 = 1
+                                elseif tbNpc.camp ~= 0 and IsAttackableCamp and IsAttackableCamp(tbNpc.camp, fighter2Camp) == 1 then
+                                    isHostileKind0 = 1
+                                end
+                                if isHostileKind0 == 1 and bestKind0 == 0 then
+                                    bestKind0 = idx
+                                end
+                            end
+                        elseif fighter2Kind == 0 and IsAttackableCamp and IsAttackableCamp(tbNpc.camp, fighter2Camp) == 1 then
+                            return idx
+                        end
+                    end
                 end
             end
         end
+        if bestMonster > 0 then return bestMonster end
+        if bestKind0 > 0 then return bestKind0 end
         return 0
     end,
     CanLeaveFight = function(self, simInstance, tbNpc)
@@ -561,7 +892,7 @@ SimFight.Citizen = {
                         if lastPos ~= nil and lastPos ~= "none" then
                             local node = getNodeInfoByNodeName(tbNpc, lastPos)
                             Msg2Map(tbNpc.nMapId,
-                                "<color=white>" .. name .. "<color> ®¸nh ng­êi t¹i " .. tbNpc.worldInfo.name .. " " ..
+                                "<color=white>" .. name .. "<color> ??nh ng??i t?i " .. tbNpc.worldInfo.name .. " " ..
                                 floor(node.x / 8) .. " " .. floor(node.y / 16) .. "")
                         end
                     end
@@ -617,18 +948,71 @@ SimFight.Citizen = {
         reason = reason or "no reason"
 
 
-        -- If already having last fight pos, we may simply chance AI to 1
+        -- If already having last fight pos, we may simply change AI
         local currX, currY, currW = GetNpcPos(tbNpc.finalIndex)
         if tbNpc.lastFightPos then
             if tbNpc.lastFightPos.W == currW then
                 if (GetDistanceRadius(tbNpc.lastFightPos.X/32, tbNpc.lastFightPos.Y/32, currX/32, currY/32) < 16) then
-                    self:SetFightState(tbNpc, 9, currX, currY)
+                    local outdoorOkFast = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+                    if tbNpc.mode == "train" or outdoorOkFast then
+                        local sk = SimPickSkill and SimPickSkill(tbNpc)
+                        local sid = (sk and sk[1]) or (tbNpc.skillCastBua and tbNpc.skillCastBua[1]) or 0
+                        if sid > 0 and SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sid) end
+                        self:SetFightState(tbNpc, 9, currX, currY)
+                        if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
+                        -- Bind combat skill so engine AI prefers VFX skill, not bare auto-attack
+                        if SetNpcCombat and sid > 0 then SetNpcCombat(tbNpc.finalIndex, 1, sid) end
+                        if (not tbNpc.foundNpcEnemy) or tbNpc.foundNpcEnemy <= 0 then
+                            local e = self:IsNpcEnemyAround(simInstance, tbNpc)
+                            if e and e > 0 then tbNpc.foundNpcEnemy = e end
+                        end
+                        if tbNpc.foundNpcEnemy and tbNpc.foundNpcEnemy > 0 and NpcRun and GetNpcPos then
+                            local _ex, _ey = GetNpcPos(tbNpc.foundNpcEnemy)
+                            if _ex and _ey then
+                                NpcRun(tbNpc.finalIndex, floor(_ex / 32), floor(_ey / 32))
+                            end
+                        end
+                        if self.Update then self:Update(simInstance, tbNpc) end
+                    else
+                        self:SetFightState(tbNpc, 9, currX, currY)
+                    end
                     return 1
                 end
             end
         end
         
-        if tbNpc.mode == "train" then self:SetFightState(tbNpc, 9, currX, currY); return 1 end   
+        local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+        if tbNpc.mode == "train" or outdoorOk then
+            -- Engine AI hunts (9->1). Lua Update + SetNpcCombat(skillId) force visible faction skills.
+            local sk = SimPickSkill and SimPickSkill(tbNpc)
+            local sid = (sk and sk[1]) or (tbNpc.skillCastBua and tbNpc.skillCastBua[1]) or 0
+            if sid > 0 and SimApplyHorseCombat then SimApplyHorseCombat(tbNpc, sid) end
+            self:SetFightState(tbNpc, 9, currX, currY)
+            if SetNpcKind then SetNpcKind(tbNpc.finalIndex, 0) end
+            if SetNpcCombat and sid > 0 then SetNpcCombat(tbNpc.finalIndex, 1, sid) end
+            if (not tbNpc.foundNpcEnemy) or tbNpc.foundNpcEnemy <= 0 then
+                local e = self:IsNpcEnemyAround(simInstance, tbNpc)
+                if e and e > 0 then tbNpc.foundNpcEnemy = e end
+            end
+            if tbNpc.foundNpcEnemy and tbNpc.foundNpcEnemy > 0 and NpcRun and GetNpcPos then
+                local _ex, _ey = GetNpcPos(tbNpc.foundNpcEnemy)
+                if _ex and _ey then
+                    NpcRun(tbNpc.finalIndex, floor(_ex / 32), floor(_ey / 32))
+                end
+            end
+            if self.Update then self:Update(simInstance, tbNpc) end
+            if SIMBOT_COMBAT_DEBUG == 1 and Msg2Player and simInstance then
+                local pId = simInstance.GetPlayer and simInstance:GetPlayer(nListId)
+                if pId and pId > 0 then
+                    Msg2Player(format("[SIMBOT_COMBAT_DEBUG] JoinFight bot=%s mode=%s enemy=%s reason=%s",
+                        tostring(tbNpc.szName or tbNpc.finalIndex),
+                        tostring(tbNpc.mode),
+                        tostring(tbNpc.foundNpcEnemy or 0),
+                        tostring(reason or "none")))
+                end
+            end
+            return 1
+        end
         tbNpc.entitySys:Respawn(simInstance, tbNpc, 3, "JoinFight " .. reason)      
         return 1
     end,
@@ -684,21 +1068,58 @@ SimFight.KeoXe = {
     IsNpcEnemyAround = function(self, simInstance, tbNpc)
         local allNpcs = {}
         local nCount = 0
+        local outdoorOk = tbNpc.worldInfo and tbNpc.worldInfo.allowFighting == 1 and tbNpc.worldInfo.cityPeace ~= 1
+        local grind = (tbNpc.mode == "train" or outdoorOk)
         local radius = tbNpc.RADIUS_FIGHT_SCAN or RADIUS_FIGHT_SCAN
+        if grind then
+            radius = tbNpc.RADIUS_FIGHT_SCAN or 20
+        end
         -- Keo xe?
         local pID = simInstance:GetPlayer(tbNpc.id)
         if pID > 0 then
             allNpcs, nCount = CallPlayerFunction(pID, GetAroundNpcList, radius)
-        
+            if not allNpcs or not nCount or nCount <= 0 then return 0 end
+
+            local bestMonster = 0
+            local bestKind0 = 0
             for i = 1, nCount do
-                if allNpcs[i] ~= tbNpc.finalIndex then
-                    local fighter2Kind = GetNpcKind(allNpcs[i])
-                    local fighter2Camp = GetNpcCurCamp(allNpcs[i])
-                    if fighter2Kind == 0 and ((tbNpc.mode == "train" and GetNpcParam(allNpcs[i], 4) ~= 1) or (IsAttackableCamp(tbNpc.camp, fighter2Camp) == 1)) then  
-                        return allNpcs[i]
+                local idx = allNpcs[i]
+                if idx and idx ~= tbNpc.finalIndex then
+                    local isSim = GetNpcParam and (GetNpcParam(idx, 4) == 1)
+                    if not isSim then
+                        local fighter2Kind = GetNpcKind(idx)
+                        local fighter2Camp = GetNpcCurCamp(idx)
+                        local alive = 1
+                        if NPCINFO_GetNpcCurrentLife then
+                            local life = NPCINFO_GetNpcCurrentLife(idx)
+                            if life ~= nil and life <= 0 then alive = 0 end
+                        end
+                        if alive == 1 then
+                            if grind then
+                                -- Prefer real monsters (kind ~= 0)
+                                if fighter2Kind ~= nil and fighter2Kind ~= 0 then
+                                    if bestMonster == 0 then bestMonster = idx end
+                                elseif fighter2Kind == 0 then
+                                    -- Only allow kind-0 player/PvP targets through explicit DoSat/hostile-PvP rules
+                                    local isHostileKind0 = 0
+                                    if tbNpc.isDoSat == 1 or tbNpc.camp == 5 then
+                                        isHostileKind0 = 1
+                                    elseif tbNpc.camp ~= 0 and IsAttackableCamp and IsAttackableCamp(tbNpc.camp, fighter2Camp) == 1 then
+                                        isHostileKind0 = 1
+                                    end
+                                    if isHostileKind0 == 1 and bestKind0 == 0 then
+                                        bestKind0 = idx
+                                    end
+                                end
+                            elseif fighter2Kind == 0 and IsAttackableCamp(tbNpc.camp, fighter2Camp) == 1 then
+                                return idx
+                            end
+                        end
                     end
                 end
             end
+            if bestMonster > 0 then return bestMonster end
+            if bestKind0 > 0 then return bestKind0 end
         end
         return 0
     end,
@@ -750,12 +1171,19 @@ SimFight.KeoXe = {
             if mode == 1 then 
                 SetNpcKind(tbNpc.finalIndex, 0)
             else
-                SetNpcKind(tbNpc.finalIndex, tbNpc.kind or 4)
+                if tbNpc.mode == "train" or tbNpc.isAttackable == 1 then
+                    SetNpcKind(tbNpc.finalIndex, 0)
+                else
+                    SetNpcKind(tbNpc.finalIndex, tbNpc.kind or 4)
+                end
             end
             return 1
         end
 
-        if tbNpc.isPlayerFighting == 0 then
+        -- Combat bots stay kind=0 so players can PK them; kind=4 = unattackable NPC mode
+        if tbNpc.mode == "train" or tbNpc.tongkim == 1 or tbNpc.isAttackable == 1 then
+            SetNpcKind(tbNpc.finalIndex, 0)
+        elseif tbNpc.isPlayerFighting == 0 then
             SetNpcKind(tbNpc.finalIndex, 0)
         else
             SetNpcKind(tbNpc.finalIndex, tbNpc.kind or 4)

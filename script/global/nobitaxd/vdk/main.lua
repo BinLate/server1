@@ -19,10 +19,12 @@ function simcity_addNpcs()
 	--SimCityVatNuoi:addNpcs()
 
 	-- Event sys when user enter/leave map
-	for id, map in SimCityMap do
-		EventSys:GetType("EnterMap"):Reg(id, SimCityThanhThi.onPlayerEnterMap, SimCityThanhThi)
-		EventSys:GetType("LeaveMap"):Reg(id, SimCityThanhThi.onPlayerExitMap, SimCityThanhThi)
-		EventSys:GetType("EnterMap"):Reg(id, SimCityVatNuoi.onPlayerEnterMap, SimCityVatNuoi)		
+	if SimCityMap and next(SimCityMap, nil) and SimCityThanhThi and SimCityVatNuoi then
+		for id, map in SimCityMap do
+			EventSys:GetType("EnterMap"):Reg(id, SimCityThanhThi.onPlayerEnterMap, SimCityThanhThi)
+			EventSys:GetType("LeaveMap"):Reg(id, SimCityThanhThi.onPlayerExitMap, SimCityThanhThi)
+			EventSys:GetType("EnterMap"):Reg(id, SimCityVatNuoi.onPlayerEnterMap, SimCityVatNuoi)		
+		end
 	end
 	
 

@@ -34,10 +34,14 @@ TONGKIM_SPAWN_MINSTAY = 0         -- thoi gian toi thieu o lai dai doanh truoc k
 TONGKIM_SPAWN_MAXSTAY = 1        -- thoi gian toi da co the nup trong dai doanh
 
 -- DYNAMIC AOI & TRAINING MAP BUDGET setup
+SIMBOT_TRAIN_START_LEVEL = 10     -- cap khoi tao bot train moi (chua co roster)
 TRAIN_BOT_MAX_PER_MAP = 25        -- so luong bot toi da tren 1 map luyen cong
-TRAIN_BOT_GLOBAL_BUDGET = 200     -- tong ngan sach Simbot luyen cong toan server
+TRAIN_BOT_GLOBAL_BUDGET = 350     -- tong ngan sach Simbot luyen cong toan server (nhieu map 0x-200)
+TRAIN_DOSAT_PCT = 8               -- % bot train Do Sat (camp5) attack players; rest peaceful grind only
+TRAIN_SKILL_CAST_CD_TICKS = 1     -- train Lua cast cooldown (ticks); low = more faction skill VFX on Client
 AOI_SCAN_INTERVAL = 15            -- chu ky quet nguoi choi (giay)
 AOI_HIBERNATE_TIMEOUT = 120       -- thoi gian khong co nguoi choi se hibernate (giay)
+SIMBOT_COMBAT_DEBUG = 0           -- debug log for train/fight combat (0=off, 1=on)
 
 -- SIMBOT COMBAT SAFETY & LIMITS
 SIMBOT_MAX_LEVEL = 200            -- cap do toi da cua Simbot

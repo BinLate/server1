@@ -22,7 +22,11 @@ function worldLoop()
     AddTimer(REFRESH_RATE*3, "worldLoop", SimCityWorld)
 end 
 
-AddTimer(REFRESH_RATE, "mainLoop", SimCitizen)
-AddTimer(REFRESH_RATE*3, "worldLoop", SimCityWorld)
+if SimCitizen and SimCitizen.ATick then
+	AddTimer(REFRESH_RATE, "mainLoop", SimCitizen)
+end
+if SimCityWorld and SimCityWorld.ATick then
+	AddTimer(REFRESH_RATE*3, "worldLoop", SimCityWorld)
+end
 
 -- [2026-06-27] fast-cast goi tu mainLoop (xem ham mainLoop) -> bo timer rieng (ko on dinh)

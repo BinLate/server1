@@ -211,3 +211,116 @@ function SimParty:OnPartyTick(simInstance, partyId)
         end
     end
 end
+
+-- Bind bot into real player party follow (engine PollParty path)
+function SimParty:BindBotToPlayer(tbNpc, playerId)
+    if not tbNpc or not playerId or playerId <= 0 then return 0 end
+    if not tbNpc.finalIndex or tbNpc.finalIndex <= 0 then return 0 end
+    if tbNpc.partyPlayerId and tbNpc.partyPlayerId == playerId then return 1 end
+
+    tbNpc.partyPlayerId = playerId
+    tbNpc.partyFarTicks = 0
+    tbNpc.partyIconFixN = 0
+    if SetBotSpeed then SetBotSpeed(tbNpc.finalIndex, 15, 24) end
+    if PartyRebind then
+        PartyRebind(tbNpc.finalIndex, tbNpc.finalIndex, playerId)
+    end
+    local pcamp = CallPlayerFunction and CallPlayerFunction(playerId, GetCurCamp)
+    if pcamp ~= nil then
+        tbNpc.partyOldCamp = tbNpc.camp or 0
+        tbNpc.camp = pcamp
+        if SetNpcCurCamp then SetNpcCurCamp(tbNpc.finalIndex, pcamp) end
+    end
+    return 1
+end
+
+-- Bot invites / joins nearby player party (probe engine invite APIs, else PartyRebind)
+function SimParty:InviteNearbyPlayer(simInstance, tbNpc, radius)
+    if not tbNpc or tbNpc.isDead == 1 then return 0 end
+    if tbNpc.partyPlayerId or tbNpc.duelPlayerId then return 0 end
+    if not tbNpc.finalIndex or tbNpc.finalIndex <= 0 then return 0 end
+    radius = radius or 20
+
+    local now = tbNpc.tick_breath or 0
+    if tbNpc.partyInviteCd and tbNpc.partyInviteCd > now then return 0 end
+    tbNpc.partyInviteCd = now + (45 * 18 / (REFRESH_RATE or 18))
+
+    local bestP = 0
+    local bestD = 99999
+    local myX32, myY32, myW = GetNpcPos(tbNpc.finalIndex)
+    if not myX32 then return 0 end
+    local myTX = floor(myX32 / 32)
+    local myTY = floor(myY32 / 32)
+
+    if GetNpcAroundPlayerList then
+        local pl, pc = GetNpcAroundPlayerList(tbNpc.finalIndex, radius)
+        if pl and pc and pc > 0 then
+            for i = 1, pc do
+                local pID = pl[i]
+                if pID and pID > 0 then
+                    local pW, pX, pY = CallPlayerFunction(pID, GetWorldPos)
+                    if pW and pX and pY then
+                        local d = GetDistanceRadius(myTX, myTY, pX, pY)
+                        if d < bestD then
+                            bestD = d
+                            bestP = pID
+                        end
+                    end
+                end
+            end
+        end
+    end
+    if bestP <= 0 then return 0 end
+
+    local invited = 0
+    if NpcInviteParty then
+        invited = NpcInviteParty(tbNpc.finalIndex, bestP) or 0
+    elseif InviteParty then
+        invited = InviteParty(tbNpc.finalIndex, bestP) or 0
+    elseif BotInviteParty then
+        invited = BotInviteParty(tbNpc.finalIndex, bestP) or 0
+    elseif PartyInvitePlayer then
+        invited = PartyInvitePlayer(tbNpc.finalIndex, bestP) or 0
+    end
+
+    -- Fallback: bind follow/party immediately (player sees bot join via PartyRebind)
+    self:BindBotToPlayer(tbNpc, bestP)
+    if Msg2Player then
+        local _oldPI = PlayerIndex
+        PlayerIndex = bestP
+        Msg2Player("SimBot moi ban vao PT (hoac da join follow).")
+        PlayerIndex = _oldPI
+    end
+    if NpcChat then
+        NpcChat(tbNpc.finalIndex, "Vao PT train cung di!")
+    end
+    return 1
+end
+
+-- Player menu: nearest train bot on this map joins the calling player
+function SimParty:InviteNearestBotToPlayer(playerId, mapId, radius)
+    if not playerId or playerId <= 0 then return 0 end
+    if not SimCitizen or not SimCitizen.fighterList then return 0 end
+    radius = radius or 25
+    local pW, pX, pY = CallPlayerFunction(playerId, GetWorldPos)
+    if not pW then return 0 end
+    mapId = mapId or pW
+
+    local best = nil
+    local bestD = 99999
+    for k, bot in SimCitizen.fighterList do
+        if bot and bot.mode == "train" and bot.isDead ~= 1 and bot.nMapId == mapId
+            and bot.finalIndex and bot.finalIndex > 0 and not bot.partyPlayerId then
+            local bx, by = GetNpcPos(bot.finalIndex)
+            if bx then
+                local d = GetDistanceRadius(floor(bx / 32), floor(by / 32), pX, pY)
+                if d < bestD and d <= radius then
+                    bestD = d
+                    best = bot
+                end
+            end
+        end
+    end
+    if not best then return 0 end
+    return self:BindBotToPlayer(best, playerId)
+end

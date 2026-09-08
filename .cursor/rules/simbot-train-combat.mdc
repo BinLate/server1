@@ -1,0 +1,38 @@
+---
+description: SimBot train combat invariants — never leave bots idle next to monsters
+globs: script/global/nobitaxd/vdk/simcity/**/*.lua
+alwaysApply: true
+---
+
+# SimBot train combat — must not regress
+
+## Hard rule (train / outdoor grind)
+
+When a train bot `JoinFight`, it MUST enable **engine AI hunt** like `server1-goc`:
+
+```lua
+-- ✅ REQUIRED (goc)
+self:SetFightState(tbNpc, 9, currX, currY)  -- 9 maps to AI mode 1
+
+-- ❌ FORBIDDEN for train JoinFight
+self:SetFightState(tbNpc, 0, ...)  -- AI off + Lua-only = đứng im cạnh quái
+```
+
+Align horse **before** enabling AI (`SimApplyHorseCombat` with `SimPickSkill`), so FOOT skills are not cast while mounted.
+
+## Do not break engage
+
+- Keep Case 3 fallback: if `CHANCE_ATTACK_NPC > 1`, still `JoinFight` even when scan misses.
+- Train must **not** `LeaveFight` merely because `CanLeaveFight` (empty scan); engine AI keeps hunting.
+- `CHANCE_ATTACK_NPC` for train spawn must be `> 1` (pluyencong uses `2`).
+- Spawn sets `worldInfo.allowFighting = 1` on train maps.
+
+## Before finishing any SimBot combat change
+
+1. Diff against `server1-goc` JoinFight / train engage path.
+2. Run: `python -m unittest tests.test_train_combat_engage tests.test_train_maps_faction_camp`
+3. Mentally verify: bot near monster → `JoinFight` → AI mode 1 → attacks (not idle statue).
+
+## Horse / skill meta
+
+Horse allowlist is additive. Never “fix horse” by switching train back to AI mode 0 without a proven Lua hunt that finds monsters every tick.

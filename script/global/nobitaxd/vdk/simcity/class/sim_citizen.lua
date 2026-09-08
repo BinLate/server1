@@ -46,11 +46,24 @@ function SimCitizen:New(fighter)
         tbNpc[k] = v
     end
 
-    -- All good generate name for Thanh Thi
+    -- Player-like names for thanh thi / train (NEVER use NPC template e.g. "Temple 22")
     if tbNpc.mode == nil or tbNpc.mode == "thanhthi" or tbNpc.mode == "train" then
         if tbNpc.worldInfo.showName == 1 then
-            if (not tbNpc.szName) or tbNpc.szName == "" then
-                tbNpc.szName = SimCityNPCInfo:getName(tbNpc.nNpcId)
+            local raw = tbNpc.szName
+            local badTemplate = 0
+            if raw and type(raw) == "string" and strfind(raw, "Temple") then
+                badTemplate = 1
+            end
+            if (not raw) or raw == "" or raw == " " or badTemplate == 1 then
+                if tbNpc.ngoaitrang == 1 or tbNpc.mode == "train" then
+                    tbNpc.szName = SimCityNPCInfo:generateName()
+                else
+                    local n = SimCityNPCInfo:getName(tbNpc.nNpcId)
+                    if (not n) or n == "" or (strfind and strfind(n, "Temple")) then
+                        n = SimCityNPCInfo:generateName()
+                    end
+                    tbNpc.szName = n
+                end
             end
         else
             tbNpc.szName = " "
